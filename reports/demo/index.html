@@ -11,9 +11,9 @@ table.table th{background:#f0f4fa} img{max-width:100%}
 .note{color:#555;font-size:13px}
 </style></head><body>
 <h1>HengSeng Sentiment Price Prediction</h1>
-<div class="note">Generated 2026-11-07 13:21 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
-<div class='banner'>DEMO: synthetic data for pipeline testing. Not real market or social data. Sentiment history covers 7 session(s); the sentiment model needs 60. Until then, the sentiment model&#x27;s weights are untrained and its results are not meaningful.</div>
-<h2>Data coverage</h2><p class='note'>Posts are filtered to the 10-day window, but each source exposes a different depth. Naver's public board only serves its latest ~50 posts per ticker per run, so its coverage is concentrated on the most recent session(s); daily runs accumulate history.</p><table class="dataframe table">
+<div class="note">Generated 2026-11-07 14:17 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
+<div class='banner'>DEMO: synthetic data for pipeline testing. Not real market or social data. Sentiment history covers 7 session(s). Below 60 sessions the pipeline reports a pooled leave-one-session-out model as short-history evidence, not a full walk-forward.</div>
+<h2>Data coverage</h2><p class='note'>Posts are filtered to the 10-day window. Naver is paginated through its JSON API and sampled at up to 80 posts per ticker per day; LIHKG/Telegram coverage depends on keyword discovery. The table shows the actual first/last timestamp per feed.</p><table class="dataframe table">
   <thead>
     <tr style="text-align: right;">
       <th>exchange</th>
@@ -28,29 +28,29 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>HKEX</td>
       <td>demo_social</td>
       <td>344</td>
-      <td>2026-10-28 14:28</td>
-      <td>2026-11-07 13:21</td>
+      <td>2026-10-28 15:24</td>
+      <td>2026-11-07 14:17</td>
     </tr>
     <tr>
       <td>KRX</td>
       <td>demo_social</td>
       <td>431</td>
-      <td>2026-10-28 13:52</td>
-      <td>2026-11-07 12:40</td>
+      <td>2026-10-28 14:48</td>
+      <td>2026-11-07 13:36</td>
     </tr>
     <tr>
       <td>HKEX</td>
       <td>exa_news</td>
       <td>66</td>
-      <td>2026-10-28 18:39</td>
-      <td>2026-11-07 13:21</td>
+      <td>2026-10-28 19:35</td>
+      <td>2026-11-07 14:17</td>
     </tr>
     <tr>
       <td>KRX</td>
       <td>exa_news</td>
       <td>89</td>
-      <td>2026-10-28 16:57</td>
-      <td>2026-11-07 10:55</td>
+      <td>2026-10-28 17:53</td>
+      <td>2026-11-07 11:51</td>
     </tr>
   </tbody>
 </table><h2>HKEX</h2><h3>Ranked by social mentions</h3><table class="dataframe table">
@@ -560,6 +560,198 @@ table.table th{background:#f0f4fa} img{max-width:100%}
     </tr>
   </tbody>
 </table>
+<h2>Sentiment model - short-history panel</h2><p class='note'>Pooled leave-one-session-out over the sessions that have social/news data. Every row is predicted by a model trained on the other sessions. With fewer than 60 sessions this is evidence that the sentiment features carry fitted weights, not a statistically robust backtest.</p><table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>subset</th>
+      <th>model</th>
+      <th>n</th>
+      <th>mae_price</th>
+      <th>rmse_price</th>
+      <th>mape_pct</th>
+      <th>direction_acc_pct</th>
+      <th>skill_vs_naive_pct</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>all</td>
+      <td>naive</td>
+      <td>60</td>
+      <td>2.317</td>
+      <td>3.192</td>
+      <td>1.210</td>
+      <td>-</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>all</td>
+      <td>ridge_price</td>
+      <td>60</td>
+      <td>2.356</td>
+      <td>3.246</td>
+      <td>1.244</td>
+      <td>46.667</td>
+      <td>-2.88</td>
+    </tr>
+    <tr>
+      <td>all</td>
+      <td>ridge_sent</td>
+      <td>60</td>
+      <td>2.311</td>
+      <td>3.190</td>
+      <td>1.206</td>
+      <td>48.333</td>
+      <td>0.31</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>naive</td>
+      <td>60</td>
+      <td>2.317</td>
+      <td>3.192</td>
+      <td>1.210</td>
+      <td>-</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>ridge_price</td>
+      <td>60</td>
+      <td>2.356</td>
+      <td>3.246</td>
+      <td>1.244</td>
+      <td>46.667</td>
+      <td>-2.88</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>ridge_sent</td>
+      <td>60</td>
+      <td>2.311</td>
+      <td>3.190</td>
+      <td>1.206</td>
+      <td>48.333</td>
+      <td>0.31</td>
+    </tr>
+  </tbody>
+</table><h3>Hyperparameter sensitivity (nested)</h3><p class='note'>Alpha chosen by inner leave-one-session-out inside each training fold. This removes the tuning advantage; a result close to the naive baseline is expected at this sample size.</p><table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>subset</th>
+      <th>model</th>
+      <th>n</th>
+      <th>mae_price</th>
+      <th>rmse_price</th>
+      <th>mape_pct</th>
+      <th>direction_acc_pct</th>
+      <th>skill_vs_naive_pct</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>all</td>
+      <td>naive</td>
+      <td>60</td>
+      <td>2.317</td>
+      <td>3.192</td>
+      <td>1.210</td>
+      <td>-</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <td>all</td>
+      <td>ridge_price</td>
+      <td>60</td>
+      <td>2.356</td>
+      <td>3.246</td>
+      <td>1.244</td>
+      <td>46.667</td>
+      <td>-2.880</td>
+    </tr>
+    <tr>
+      <td>all</td>
+      <td>ridge_sent</td>
+      <td>60</td>
+      <td>2.319</td>
+      <td>3.208</td>
+      <td>1.210</td>
+      <td>48.333</td>
+      <td>-0.036</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>naive</td>
+      <td>60</td>
+      <td>2.317</td>
+      <td>3.192</td>
+      <td>1.210</td>
+      <td>-</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>ridge_price</td>
+      <td>60</td>
+      <td>2.356</td>
+      <td>3.246</td>
+      <td>1.244</td>
+      <td>46.667</td>
+      <td>-2.880</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>ridge_sent</td>
+      <td>60</td>
+      <td>2.319</td>
+      <td>3.208</td>
+      <td>1.210</td>
+      <td>48.333</td>
+      <td>-0.036</td>
+    </tr>
+  </tbody>
+</table><h3>Standardized coefficients</h3><p class='note'>Standardized Ridge coefficients; larger absolute values mean the feature moves the predicted next-session return more.</p><table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>feature</th>
+      <th>coefficient</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>news_sent_wmean</td>
+      <td>0.0020</td>
+    </tr>
+    <tr>
+      <td>ret_5</td>
+      <td>-0.0014</td>
+    </tr>
+    <tr>
+      <td>social_n_log</td>
+      <td>0.0009</td>
+    </tr>
+    <tr>
+      <td>ret_1</td>
+      <td>0.0004</td>
+    </tr>
+    <tr>
+      <td>vol_10</td>
+      <td>0.0004</td>
+    </tr>
+    <tr>
+      <td>rsi_14</td>
+      <td>-0.0003</td>
+    </tr>
+    <tr>
+      <td>social_sent_wmean</td>
+      <td>-0.0003</td>
+    </tr>
+    <tr>
+      <td>has_social</td>
+      <td>0.0000</td>
+    </tr>
+  </tbody>
+</table>
 <h2>Prediction check: recent out-of-sample forecasts vs actual</h2>
 <table class="dataframe table">
   <thead>
@@ -858,6 +1050,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <th>pred_price</th>
       <th>signal</th>
       <th>model_used</th>
+      <th>pred_sent_ret</th>
+      <th>pred_sent_price</th>
     </tr>
   </thead>
   <tbody>
@@ -870,6 +1064,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>94.2936</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0004</td>
+      <td>94.2587</td>
     </tr>
     <tr>
       <td>1810.HK</td>
@@ -880,6 +1076,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>180.8441</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0031</td>
+      <td>180.2236</td>
     </tr>
     <tr>
       <td>0700.HK</td>
@@ -890,6 +1088,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>151.0336</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0030</td>
+      <td>150.3771</td>
     </tr>
     <tr>
       <td>035720.KS</td>
@@ -900,6 +1100,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>313.8993</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0021</td>
+      <td>313.1818</td>
     </tr>
     <tr>
       <td>005930.KS</td>
@@ -910,6 +1112,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>79.9258</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0017</td>
+      <td>79.7195</td>
     </tr>
     <tr>
       <td>005380.KS</td>
@@ -920,6 +1124,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>78.8861</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0007</td>
+      <td>78.8302</td>
     </tr>
     <tr>
       <td>000660.KS</td>
@@ -930,6 +1136,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>270.3890</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0032</td>
+      <td>269.5266</td>
     </tr>
     <tr>
       <td>0005.HK</td>
@@ -940,6 +1148,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>34.1229</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0010</td>
+      <td>34.1380</td>
     </tr>
     <tr>
       <td>3690.HK</td>
@@ -950,6 +1160,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>273.3895</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>-0.0020</td>
+      <td>272.9749</td>
     </tr>
     <tr>
       <td>9988.HK</td>
@@ -960,6 +1172,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>299.2330</td>
       <td>FLAT</td>
       <td>ridge_price</td>
+      <td>0.0005</td>
+      <td>299.2611</td>
     </tr>
   </tbody>
 </table>
