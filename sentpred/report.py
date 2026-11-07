@@ -159,9 +159,9 @@ def _mae_chart(metrics: pd.DataFrame, path: Path) -> Path | None:
     if sub.empty:
         return None
     fig, ax = plt.subplots(figsize=(6, 3))
-    ax.bar(sub["model"], sub["mae_price"], color=["#9e9e9e", "#1565c0", "#ef6c00"][: len(sub)])
-    ax.set_ylabel("MAE (price, out-of-sample)")
-    ax.set_title("Walk-forward error by model (lower is better)")
+    ax.bar(sub["model"], sub["mape_pct"], color=["#9e9e9e", "#1565c0", "#ef6c00"][: len(sub)])
+    ax.set_ylabel("MAPE % (out-of-sample)")
+    ax.set_title("Walk-forward price error by model (lower is better)")
     fig.tight_layout()
     fig.savefig(path, dpi=110)
     plt.close(fig)

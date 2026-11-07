@@ -56,9 +56,9 @@ Exa (`POST https://api.exa.ai/search`, `category: news`, `startPublishedDate` se
 
 **Models.** A no-change baseline (`naive`), `ridge_price` (technicals only) and `ridge_sent` (technicals + sentiment). Ridge regression is used because the sample is small.
 
-**Validation.** Expanding-window walk-forward. A warm-up of `min_train_dates` sessions is followed by out-of-sample blocks of `test_block` sessions. Training stops two sessions before each block, so no label overlaps the test period. Reported metrics: MAE, RMSE and MAPE of the price, direction accuracy, and skill against the naive baseline. Metrics are reported for all rows and for the social-window rows only.
+**Validation.** Expanding-window walk-forward. A warm-up of `min_train_dates` sessions is followed by out-of-sample blocks of `test_block` sessions. Training stops two sessions before each block, so no label overlaps the test period. Reported metrics: MAE, RMSE and MAPE of the price, direction accuracy, and skill against the naive baseline. Metrics are reported for all rows and for the social-window rows only. Absolute price errors are not comparable across assets, so model selection and the headline chart use MAPE.
 
-**Headline forecast.** The model with the lowest out-of-sample price MAE is refit on all history and predicts each asset's next close. The signal is LONG or SHORT when the predicted move exceeds `signal_threshold`, and FLAT otherwise.
+**Headline forecast.** The model with the lowest out-of-sample MAPE is refit on all history and predicts each asset's next close. The signal is LONG or SHORT when the predicted move exceeds `signal_threshold`, and FLAT otherwise.
 
 **Support and resistance.** Swing highs and lows over 120 sessions, clustered within 1.5%, split around the last close. Classic daily pivots (P, R1, R2, S1, S2) are included.
 

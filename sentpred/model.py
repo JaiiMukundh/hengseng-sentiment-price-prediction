@@ -63,12 +63,13 @@ def evaluate(preds: pd.DataFrame) -> pd.DataFrame:
                 "mae_price": float(err.abs().mean()),
                 "rmse_price": float(np.sqrt((err ** 2).mean())),
                 "mape_pct": float((err.abs() / sub["next_close"]).mean() * 100),
-                "direction_acc_pct": float(direction[nonzero].mean() * 100),
+                # Naive never picks a direction, so its direction accuracy is undefined.
+                "direction_acc_pct": np.nan if model == "naive" else float(direction[nonzero].mean() * 100),
             })
     out = pd.DataFrame(rows)
-    naive_mae = out[(out.model == "naive")].set_index("subset")["mae_price"]
+    naive_mape = out[(out.model == "naive")].set_index("subset")["mape_pct"]
     out["skill_vs_naive_pct"] = out.apply(
-        lambda r: (1 - r["mae_price"] / naive_mae[r["subset"]]) * 100, axis=1
+        lambda r: (1 - r["mape_pct"] / naive_mape[r["subset"]]) * 100, axis=1
     )
     return out
 
@@ -78,7 +79,8 @@ def live_forecast(df: pd.DataFrame, metrics: pd.DataFrame, alpha: float, thresho
     labeled = df.dropna(subset=["y_next_ret"] + PRICE_FEATURES)
     latest = df.sort_values("date").groupby("ticker").tail(1).copy()
 
-    overall = metrics[metrics["subset"] == "all"].set_index("model")["mae_price"]
+    # MAPE, not absolute price error: the pooled assets trade in different currencies.
+    overall = metrics[metrics["subset"] == "all"].set_index("model")["mape_pct"]
     best = min(MODELS, key=lambda m: overall.get(m, np.inf))
     latest["pred_ret"] = _fit(MODELS[best], labeled, alpha).predict(latest[MODELS[best]])
     latest["model_used"] = best
