@@ -166,7 +166,7 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     log.info("model: %d out-of-sample rows; best model for forecast: %s",
              len(preds), forecasts["model_used"].iloc[0] if len(forecasts) else "n/a")
     return {"prices": prices, "posts": posts, "news": news, "forecasts": forecasts,
-            "levels": lvl, "metrics": metrics, "sent_sessions": sent_sessions}
+            "levels": lvl, "metrics": metrics, "preds": preds, "sent_sessions": sent_sessions}
 
 
 def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> Path:
@@ -178,7 +178,7 @@ def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> 
         coverage += " Until then, the sentiment model's weights are untrained and its results are not meaningful."
     banner = " ".join(filter(None, [banner, coverage]))
     path = write_report(paths.report, cfg, state["prices"], state["posts"], state["news"],
-                        state["forecasts"], state["levels"], state["metrics"], banner)
+                        state["forecasts"], state["levels"], state["metrics"], state["preds"], banner)
     log.info("report written to %s", path)
     return path
 

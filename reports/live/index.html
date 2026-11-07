@@ -11,9 +11,63 @@ table.table th{background:#f0f4fa} img{max-width:100%}
 .note{color:#555;font-size:13px}
 </style></head><body>
 <h1>HengSeng Sentiment Price Prediction</h1>
-<div class="note">Generated 2026-11-07 12:30 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
+<div class="note">Generated 2026-11-07 13:21 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
 <div class='banner'>Sentiment history covers 7 session(s); the sentiment model needs 60. Until then, the sentiment model&#x27;s weights are untrained and its results are not meaningful.</div>
-<h2>HKEX</h2><h3>Ranked by social mentions</h3><table class="dataframe table">
+<h2>Data coverage</h2><p class='note'>Posts are filtered to the 10-day window, but each source exposes a different depth. Naver's public board only serves its latest ~50 posts per ticker per run, so its coverage is concentrated on the most recent session(s); daily runs accumulate history.</p><table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>exchange</th>
+      <th>feed</th>
+      <th>items</th>
+      <th>first_utc</th>
+      <th>last_utc</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>HKEX</td>
+      <td>lihkg</td>
+      <td>8</td>
+      <td>2026-10-29 01:41</td>
+      <td>2026-11-07 11:58</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>telegram</td>
+      <td>28</td>
+      <td>2026-11-03 07:33</td>
+      <td>2026-11-06 07:34</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>naver_discussion</td>
+      <td>356</td>
+      <td>2026-11-05 15:00</td>
+      <td>2026-11-07 12:26</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>telegram</td>
+      <td>10</td>
+      <td>2026-11-02 18:46</td>
+      <td>2026-11-07 11:06</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>exa_news</td>
+      <td>50</td>
+      <td>2026-10-30 00:00</td>
+      <td>2026-11-07 10:49</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>exa_news</td>
+      <td>50</td>
+      <td>2026-10-29 04:43</td>
+      <td>2026-11-07 11:01</td>
+    </tr>
+  </tbody>
+</table><h2>HKEX</h2><h3>Ranked by social mentions</h3><table class="dataframe table">
   <thead>
     <tr style="text-align: right;">
       <th>exchange</th>
@@ -517,6 +571,292 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>4.192</td>
       <td>36.364</td>
       <td>-4.837</td>
+    </tr>
+  </tbody>
+</table>
+<h2>Prediction check: recent out-of-sample forecasts vs actual</h2>
+<table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>exchange</th>
+      <th>ticker</th>
+      <th>date</th>
+      <th>pred_price</th>
+      <th>actual_price</th>
+      <th>error_pct</th>
+      <th>direction_hit</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>KRX</td>
+      <td>035420.KS</td>
+      <td>2026-11-03</td>
+      <td>168901.61</td>
+      <td>170800.00</td>
+      <td>-1.11</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>3690.HK</td>
+      <td>2026-11-03</td>
+      <td>74.46</td>
+      <td>75.20</td>
+      <td>-0.99</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>1810.HK</td>
+      <td>2026-11-03</td>
+      <td>28.70</td>
+      <td>28.76</td>
+      <td>-0.21</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>005380.KS</td>
+      <td>2026-11-03</td>
+      <td>277461.59</td>
+      <td>283500.00</td>
+      <td>-2.13</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>0700.HK</td>
+      <td>2026-11-03</td>
+      <td>395.96</td>
+      <td>401.60</td>
+      <td>-1.40</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>005930.KS</td>
+      <td>2026-11-03</td>
+      <td>218945.47</td>
+      <td>218000.00</td>
+      <td>0.43</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>0005.HK</td>
+      <td>2026-11-03</td>
+      <td>133.39</td>
+      <td>136.30</td>
+      <td>-2.13</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>035720.KS</td>
+      <td>2026-11-03</td>
+      <td>28716.19</td>
+      <td>29100.00</td>
+      <td>-1.32</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>9988.HK</td>
+      <td>2026-11-03</td>
+      <td>99.39</td>
+      <td>100.60</td>
+      <td>-1.20</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>000660.KS</td>
+      <td>2026-11-03</td>
+      <td>1388379.05</td>
+      <td>1396000.00</td>
+      <td>-0.55</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>9988.HK</td>
+      <td>2026-11-04</td>
+      <td>100.38</td>
+      <td>109.10</td>
+      <td>-7.99</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>3690.HK</td>
+      <td>2026-11-04</td>
+      <td>75.07</td>
+      <td>80.30</td>
+      <td>-6.51</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>000660.KS</td>
+      <td>2026-11-04</td>
+      <td>1401201.50</td>
+      <td>1264000.00</td>
+      <td>10.85</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>0700.HK</td>
+      <td>2026-11-04</td>
+      <td>399.51</td>
+      <td>430.40</td>
+      <td>-7.18</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>035720.KS</td>
+      <td>2026-11-04</td>
+      <td>29077.55</td>
+      <td>32200.00</td>
+      <td>-9.70</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>0005.HK</td>
+      <td>2026-11-04</td>
+      <td>135.88</td>
+      <td>141.10</td>
+      <td>-3.70</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>035420.KS</td>
+      <td>2026-11-04</td>
+      <td>171016.53</td>
+      <td>184900.00</td>
+      <td>-7.51</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>005930.KS</td>
+      <td>2026-11-04</td>
+      <td>219286.36</td>
+      <td>201500.00</td>
+      <td>8.83</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>005380.KS</td>
+      <td>2026-11-04</td>
+      <td>283813.14</td>
+      <td>293500.00</td>
+      <td>-3.30</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>1810.HK</td>
+      <td>2026-11-04</td>
+      <td>28.81</td>
+      <td>31.30</td>
+      <td>-7.95</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>3690.HK</td>
+      <td>2026-11-05</td>
+      <td>80.18</td>
+      <td>80.40</td>
+      <td>-0.27</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>0005.HK</td>
+      <td>2026-11-05</td>
+      <td>140.92</td>
+      <td>137.50</td>
+      <td>2.49</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>000660.KS</td>
+      <td>2026-11-05</td>
+      <td>1274422.70</td>
+      <td>1132000.00</td>
+      <td>12.58</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>005380.KS</td>
+      <td>2026-11-05</td>
+      <td>293867.02</td>
+      <td>279500.00</td>
+      <td>5.14</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>005930.KS</td>
+      <td>2026-11-05</td>
+      <td>203288.20</td>
+      <td>188700.00</td>
+      <td>7.73</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>035420.KS</td>
+      <td>2026-11-05</td>
+      <td>184986.75</td>
+      <td>190200.00</td>
+      <td>-2.74</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>KRX</td>
+      <td>035720.KS</td>
+      <td>2026-11-05</td>
+      <td>32175.31</td>
+      <td>32300.00</td>
+      <td>-0.39</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>0700.HK</td>
+      <td>2026-11-05</td>
+      <td>428.32</td>
+      <td>419.80</td>
+      <td>2.03</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>1810.HK</td>
+      <td>2026-11-05</td>
+      <td>31.21</td>
+      <td>30.38</td>
+      <td>2.73</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>HKEX</td>
+      <td>9988.HK</td>
+      <td>2026-11-05</td>
+      <td>108.56</td>
+      <td>104.90</td>
+      <td>3.49</td>
+      <td>True</td>
     </tr>
   </tbody>
 </table>

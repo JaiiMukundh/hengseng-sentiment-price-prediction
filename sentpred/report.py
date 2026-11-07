@@ -63,11 +63,21 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
 
 def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: pd.DataFrame,
                  forecasts: pd.DataFrame, levels: dict[str, dict], metrics: pd.DataFrame,
-                 banner: str | None = None) -> Path:
+                 preds: pd.DataFrame, banner: str | None = None) -> Path:
     charts = out_dir / "charts"
     charts.mkdir(parents=True, exist_ok=True)
     summary = summary_table(cfg, prices, posts, news, forecasts, levels)
     sections = []
+
+    coverage = _coverage(posts, news)
+    check = _prediction_check(preds)
+    sections.append(
+        "<h2>Data coverage</h2>"
+        "<p class='note'>Posts are filtered to the 10-day window, but each source exposes a different depth. "
+        "Naver's public board only serves its latest ~50 posts per ticker per run, so its coverage is concentrated "
+        "on the most recent session(s); daily runs accumulate history.</p>"
+        f"{_table(coverage)}"
+    )
 
     for exchange in cfg.exchanges:
         ex = summary[summary["exchange"] == exchange]
@@ -94,6 +104,7 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
         banner=banner_html,
         sections="".join(sections),
         metrics=_table(metric_view),
+        check=_table(check),
         mae=_img(mae_png),
         forecast=_table(forecasts.round({"close": 4, "pred_ret": 4, "pred_price": 4})),
         generated=pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
@@ -102,6 +113,38 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
     path.write_text(doc, encoding="utf-8")
     summary.to_csv(out_dir / "summary.csv", index=False)
     return path
+
+
+def _coverage(posts: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    if not posts.empty:
+        for (exchange, source), g in posts.groupby(["exchange", "source"]):
+            rows.append({
+                "exchange": exchange, "feed": source, "items": len(g),
+                "first_utc": g["published_utc"].min().strftime("%Y-%m-%d %H:%M"),
+                "last_utc": g["published_utc"].max().strftime("%Y-%m-%d %H:%M"),
+            })
+    if not news.empty:
+        for exchange, g in news.groupby("exchange"):
+            rows.append({
+                "exchange": exchange, "feed": "exa_news", "items": len(g),
+                "first_utc": g["published_utc"].min().strftime("%Y-%m-%d %H:%M"),
+                "last_utc": g["published_utc"].max().strftime("%Y-%m-%d %H:%M"),
+            })
+    return pd.DataFrame(rows)
+
+
+def _prediction_check(preds: pd.DataFrame, n: int = 3) -> pd.DataFrame:
+    """Show the most recent out-of-sample forecasts next to what actually happened."""
+    if preds.empty:
+        return preds
+    df = preds.sort_values("date").groupby("ticker").tail(n).copy()
+    df["pred_price"] = df["close"] * (1 + df["pred_ridge_price"])
+    df["actual_price"] = df["next_close"]
+    df["error_pct"] = (df["pred_price"] / df["actual_price"] - 1) * 100
+    df["direction_hit"] = (df["pred_ridge_price"].gt(0) == df["y_next_ret"].gt(0))
+    return df[["exchange", "ticker", "date", "pred_price", "actual_price", "error_pct", "direction_hit"]].round(
+        {"pred_price": 2, "actual_price": 2, "error_pct": 2})
 
 
 def _table(df: pd.DataFrame) -> str:
@@ -188,6 +231,8 @@ table.table th{{background:#f0f4fa}} img{{max-width:100%}}
 <h2>Out-of-sample model comparison</h2>
 {mae}
 {metrics}
+<h2>Prediction check: recent out-of-sample forecasts vs actual</h2>
+{check}
 <h2>Next-session forecasts</h2>
 {forecast}
 </body></html>

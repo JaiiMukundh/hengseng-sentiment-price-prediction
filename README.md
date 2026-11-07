@@ -110,7 +110,7 @@ Live run, both exchanges, 10-day window: **402 social posts** (LIHKG 8, Telegram
 
 - Social sentiment (combined with news in the report): bearish on HK tech (Meituan -0.67, Alibaba -0.43, Xiaomi -0.36, Tencent -0.27), neutral to mildly bearish in Korea (Kakao -0.17; Samsung, SK hynix, NAVER, Hyundai near neutral).
 - Model, out-of-sample over 1,685 pooled rows: naive baseline MAPE **2.656%**; `ridge_price` **2.673%** (direction 52.4%); `ridge_sent` **2.679%**. The sentiment model is not yet trainable with 7 sessions of history, so it has no meaningful weights and the report says so. No edge over the baseline yet, reported honestly.
-- Snapshot: [`reports/live/index.html`](reports/live/index.html) (self-contained; no usernames or raw posts).
+- Snapshot: [`reports/live/index.html`](reports/live/index.html) (self-contained; no usernames or raw posts). It includes a **data-coverage table** (so the shorter Naver history is visible) and a **prediction-check table** comparing recent out-of-sample forecasts with actual next closes.
 
 ## Running it daily
 
