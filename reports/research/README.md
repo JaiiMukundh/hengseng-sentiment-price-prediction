@@ -31,6 +31,7 @@ Social data is the bottleneck: 30 days gives only ~20 trading sessions. News was
 3. **365 days of news showed no edge.** Raw news sentiment, news volume and news hit-share all had negative net returns after 25 bps; model direction was ~49–51%; rank IC ~0.02–0.05; bootstrap CIs overlapped zero.
 4. **Cross-sectional models did not rescue it.** Technical-only models showed 11-day rank IC ~0.24–0.32, but that is price momentum on 11 days, not sentiment, and not stable.
 5. **Late-session sentiment** (last 2 hours before close) had 14 usable days and was negative after costs.
+6. **Five years of price-only cross-sectional reversal/momentum** also failed: gross long/short returns were ~0.03–0.21%/day, and 25 bps daily rebalancing costs made every variant negative (`research/price_edge.py`).
 
 ## Conclusion
 
