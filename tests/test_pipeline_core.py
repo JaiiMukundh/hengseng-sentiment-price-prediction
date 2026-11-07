@@ -86,6 +86,34 @@ def test_live_forecast_one_row_per_ticker_with_signal():
     assert np.allclose(fc.set_index("ticker")["close"], last_close)
 
 
+def test_short_history_sentiment_model_trains_real_weights():
+    prices = _prices(n_days=30, tickers=("0700.HK", "9988.HK"))
+    dataset = build_dataset(prices, pd.DataFrame(columns=["ticker", "date"]), pd.DataFrame(columns=["ticker", "date"]))
+    rng = np.random.default_rng(5)
+    dataset["has_social"] = 1.0
+    dataset["social_n"] = 1.0
+    dataset["social_n_log"] = 1.0
+    dataset["social_sent_mean"] = rng.normal(0, 0.4, len(dataset))
+    dataset["social_sent_wmean"] = dataset["social_sent_mean"]
+    dataset["social_pos_share"] = 0.5
+    dataset["social_neg_share"] = 0.5
+
+    preds, n_sessions = model.leave_one_session_out(dataset, alpha=50.0, shrink=0.5)
+    expected_sessions = dataset.dropna(subset=["y_next_ret"] + PRICE_FEATURES)["date"].nunique()
+    assert n_sessions == expected_sessions
+    assert preds["pred_ridge_sent"].notna().all()
+    assert not np.allclose(preds["pred_ridge_sent"], preds["pred_ridge_price"])
+
+    coefficients = model.sentiment_coefficients(dataset, alpha=100.0)
+    assert len(coefficients) == len(model.SENTIMENT_MODEL_FEATURES)
+    sentiment_coefs = coefficients[coefficients["feature"].isin(model.SENTIMENT_MODEL_FEATURES)]
+    assert sentiment_coefs["coefficient"].abs().sum() > 0
+
+    forecast = model.sentiment_forecast(dataset, alpha=50.0, shrink=0.5)
+    assert sorted(forecast["ticker"]) == ["0700.HK", "9988.HK"]
+    assert forecast["pred_sent_price"].notna().all()
+
+
 def test_walk_forward_requires_enough_history():
     dataset = build_dataset(_prices(n_days=40), pd.DataFrame(columns=["ticker", "date"]), pd.DataFrame(columns=["ticker", "date"]))
     with pytest.raises(ValueError):

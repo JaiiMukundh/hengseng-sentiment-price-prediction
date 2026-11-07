@@ -63,7 +63,8 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
 
 def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: pd.DataFrame,
                  forecasts: pd.DataFrame, levels: dict[str, dict], metrics: pd.DataFrame,
-                 preds: pd.DataFrame, banner: str | None = None) -> Path:
+                 preds: pd.DataFrame, short_metrics: pd.DataFrame | None = None,
+                 coefficients: pd.DataFrame | None = None, banner: str | None = None) -> Path:
     charts = out_dir / "charts"
     charts.mkdir(parents=True, exist_ok=True)
     summary = summary_table(cfg, prices, posts, news, forecasts, levels)
@@ -73,9 +74,9 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
     check = _prediction_check(preds)
     sections.append(
         "<h2>Data coverage</h2>"
-        "<p class='note'>Posts are filtered to the 10-day window, but each source exposes a different depth. "
-        "Naver's public board only serves its latest ~50 posts per ticker per run, so its coverage is concentrated "
-        "on the most recent session(s); daily runs accumulate history.</p>"
+        "<p class='note'>Posts are filtered to the 10-day window. Naver is paginated through its JSON API and "
+        "sampled at up to 80 posts per ticker per day; LIHKG/Telegram coverage depends on keyword discovery. "
+        "The table shows the actual first/last timestamp per feed.</p>"
         f"{_table(coverage)}"
     )
 
@@ -99,14 +100,29 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
 
     mae_png = _mae_chart(metrics, charts / "model_mae.png")
     metric_view = metrics.round(3)
+    short_html = ""
+    if short_metrics is not None and not short_metrics.empty:
+        short_html = (
+            "<h2>Sentiment model - short-history panel</h2>"
+            "<p class='note'>Pooled leave-one-session-out over the sessions that have social/news data. "
+            "Every row is predicted by a model trained on the other sessions. With fewer than 60 sessions this "
+            "is evidence that the sentiment features carry fitted weights, not a statistically robust backtest.</p>"
+            f"{_table(short_metrics.round(3))}"
+            "<h3>Standardized coefficients</h3>"
+            "<p class='note'>Standardized Ridge coefficients; larger absolute values mean the feature moves the "
+            "predicted next-session return more.</p>"
+            f"{_table(coefficients.round(4))}"
+        )
     banner_html = f"<div class='banner'>{html.escape(banner)}</div>" if banner else ""
     doc = _HTML.format(
         banner=banner_html,
         sections="".join(sections),
         metrics=_table(metric_view),
+        short=short_html,
         check=_table(check),
         mae=_img(mae_png),
-        forecast=_table(forecasts.round({"close": 4, "pred_ret": 4, "pred_price": 4})),
+        forecast=_table(forecasts.round({"close": 4, "pred_ret": 4, "pred_price": 4,
+                                         "pred_sent_ret": 4, "pred_sent_price": 4})),
         generated=pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
     )
     path = out_dir / "index.html"
@@ -231,6 +247,7 @@ table.table th{{background:#f0f4fa}} img{{max-width:100%}}
 <h2>Out-of-sample model comparison</h2>
 {mae}
 {metrics}
+{short}
 <h2>Prediction check: recent out-of-sample forecasts vs actual</h2>
 {check}
 <h2>Next-session forecasts</h2>

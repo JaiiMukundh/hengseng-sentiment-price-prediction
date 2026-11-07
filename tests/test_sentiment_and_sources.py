@@ -72,6 +72,12 @@ def test_normalize_naver_nested_posts_uses_kst():
     assert df.iloc[0]["published_utc"] == pd.Timestamp("2026-11-06 01:30:00", tz="UTC")
 
 
+def test_naver_api_url_maps_to_ticker():
+    from sentpred.sources import _ticker_from_url
+    url = "https://m.stock.naver.com/front-api/discussion/list?itemCode=005930&pageSize=100"
+    assert _ticker_from_url(url, (SAMSUNG,), "naver_discussion") == "005930.KS"
+
+
 def test_naver_relative_and_absolute_times():
     scraped = "2026-11-07T03:00:00Z"
     assert _naver_time("1분 전", scraped) == pd.Timestamp("2026-11-07 02:59:00", tz="UTC")

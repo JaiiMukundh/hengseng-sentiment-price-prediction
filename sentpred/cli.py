@@ -146,7 +146,29 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     preds = model.walk_forward(dataset, mcfg["min_train_dates"], mcfg["test_block"], mcfg["ridge_alpha"])
     metrics = model.evaluate(preds)
     forecasts = model.live_forecast(dataset, metrics, mcfg["ridge_alpha"], mcfg["signal_threshold"])
+    sent_sessions = int(dataset.loc[dataset["has_social"] + dataset["has_news"] > 0, "date"].nunique())
 
+    short_metrics = None
+    coefficients = None
+    if sent_sessions < mcfg["min_train_dates"]:
+        sent_alpha = mcfg.get("sentiment_alpha", 50)
+        sent_shrink = mcfg.get("sentiment_shrinkage", 0.5)
+        short_preds, short_dates = model.leave_one_session_out(dataset, sent_alpha, sent_shrink)
+        short_metrics = model.evaluate(short_preds)
+        coefficients = model.sentiment_coefficients(dataset, sent_alpha)
+        forecasts = forecasts.merge(
+            model.sentiment_forecast(dataset, sent_alpha, sent_shrink), on="ticker", how="left")
+        short_metrics.to_csv(paths.processed / "short_history_metrics.csv", index=False)
+        coefficients.to_csv(paths.processed / "sentiment_coefficients.csv", index=False)
+        log.info("short-history sentiment model: %d sessions, %d rows; coefficients written",
+                 short_dates, len(short_preds))
+        log.warning("only %d sessions with social/news history (need %d for a full walk-forward); "
+                    "using pooled leave-one-session-out and reporting it as short-history",
+                    sent_sessions, mcfg["min_train_dates"])
+    else:
+        log.info("sentiment history: %d sessions (full walk-forward)", sent_sessions)
+
+    dataset.to_csv(paths.processed / "dataset.csv", index=False)
     lvl = {}
     for asset in cfg.assets:
         px = prices[prices["ticker"] == asset.ticker].sort_values("date")
@@ -154,31 +176,27 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
             continue
         lvl[asset.ticker] = {**levels.swing_levels(px), "pivots": levels.pivot_points(px.iloc[-1])}
 
-    sent_sessions = int(dataset.loc[dataset["has_social"] + dataset["has_news"] > 0, "date"].nunique())
-    if sent_sessions < mcfg["min_train_dates"]:
-        log.warning("only %d sessions with social/news history (need %d before the sentiment model is trained); "
-                    "keep the daily scrape running to accumulate history", sent_sessions, mcfg["min_train_dates"])
-
-    dataset.to_csv(paths.processed / "dataset.csv", index=False)
     preds.to_csv(paths.processed / "walk_forward_predictions.csv", index=False)
     metrics.to_csv(paths.processed / "model_metrics.csv", index=False)
     forecasts.to_csv(paths.processed / "forecasts.csv", index=False)
     log.info("model: %d out-of-sample rows; best model for forecast: %s",
              len(preds), forecasts["model_used"].iloc[0] if len(forecasts) else "n/a")
     return {"prices": prices, "posts": posts, "news": news, "forecasts": forecasts,
-            "levels": lvl, "metrics": metrics, "preds": preds, "sent_sessions": sent_sessions}
+            "levels": lvl, "metrics": metrics, "preds": preds, "sent_sessions": sent_sessions,
+            "short_metrics": short_metrics, "coefficients": coefficients}
 
 
 def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> Path:
     from .report import write_report
 
     needed = cfg.raw["model"]["min_train_dates"]
-    coverage = f"Sentiment history covers {state['sent_sessions']} session(s); the sentiment model needs {needed}."
-    if state["sent_sessions"] < needed:
-        coverage += " Until then, the sentiment model's weights are untrained and its results are not meaningful."
+    coverage = (f"Sentiment history covers {state['sent_sessions']} session(s). "
+                f"Below {needed} sessions the pipeline reports a pooled leave-one-session-out "
+                f"model as short-history evidence, not a full walk-forward.")
     banner = " ".join(filter(None, [banner, coverage]))
     path = write_report(paths.report, cfg, state["prices"], state["posts"], state["news"],
-                        state["forecasts"], state["levels"], state["metrics"], state["preds"], banner)
+                        state["forecasts"], state["levels"], state["metrics"], state["preds"],
+                        state["short_metrics"], state["coefficients"], banner)
     log.info("report written to %s", path)
     return path
 

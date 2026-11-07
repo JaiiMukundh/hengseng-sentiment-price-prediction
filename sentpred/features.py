@@ -10,6 +10,11 @@ SENTIMENT_FEATURES = [
     "social_n_log", "social_sent_mean", "social_sent_wmean", "social_pos_share", "social_neg_share",
     "social_eng_log", "news_n_log", "news_sent_mean", "news_sent_wmean", "has_social", "has_news",
 ]
+# Compact, strongly regularized feature set for the short-history sentiment panel.
+SENTIMENT_MODEL_FEATURES = [
+    "ret_1", "ret_5", "vol_10", "rsi_14",
+    "social_sent_wmean", "news_sent_wmean", "social_n_log", "has_social",
+]
 _AGG_COLUMNS = ["n", "sent_mean", "sent_wmean", "pos_share", "neg_share", "eng_log"]
 
 

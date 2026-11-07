@@ -5,8 +5,10 @@ No usernames or raw post text are included here; raw data stays in the git-ignor
 
 - `index.html` - self-contained visual report (charts embedded)
 - `summary.csv` - per-ticker price, mentions, sentiment, direction, forecast, levels
-- `model_metrics.csv` - walk-forward comparison against the naive baseline
-- `forecasts.csv` - next-session predictions
+- `model_metrics.csv` - long walk-forward comparison against the naive baseline
+- `forecasts.csv` - next-session predictions (price model + sentiment model)
+- `short_history_metrics.csv` - pooled leave-one-session-out sentiment model, 6 sessions x 10 tickers
+- `sentiment_coefficients.csv` - standardized Ridge coefficients for the sentiment features
 
-Sentiment history covers 7 sessions, below the 60 needed to train the sentiment model. The report
-states this, and the sentiment-model results in this snapshot are not meaningful yet.
+History covers 6-7 trading sessions, below the 60 a full walk-forward needs. The pipeline reports
+the pooled short-history panel instead, and labels it as illustrative rather than a robust edge.

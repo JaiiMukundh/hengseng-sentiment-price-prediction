@@ -25,34 +25,59 @@ POST_COLUMNS = [
     "author", "likes", "reposts", "views", "followers",
 ]
 
-# Runs inside apify/playwright-scraper. The board is a client-rendered Next.js app, so a browser
-# is required. Selectors were verified against the live page (Nov 2026); Naver hashes the class
-# suffixes, so match on the stable prefix. Like counts are Lottie-animated and not readable, so
-# Naver engagement uses comments and views.
+# Runs inside apify/playwright-scraper against Naver's public discussion JSON API. The board is a
+# Next.js app; the API paginates with a cursor (`lastOffset`) and returns 50 posts per call.
+# We keep paginating until posts are older than the look-back window or the page cap is hit.
 NAVER_PAGE_FUNCTION = r"""
 async function pageFunction({ page, request }) {
-    await page.waitForSelector('[class*="DiscussionPostWrapper_article"]', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(1500);
-    const posts = await page.$$eval('[class*="DiscussionPostWrapper_article"]', (lis, url) => lis.map((li) => {
-        const txt = (sel) => { const e = li.querySelector(sel); return e ? e.innerText.trim() : null; };
-        const num = (s) => { const m = (s || '').replace(/,/g, '').match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; };
-        const rtext = ((li.querySelector('[class*="ReactionBox_article"]') || {}).innerText || '').replace(/\s+/g, ' ');
-        const comment = rtext.match(/댓글\s*([\d,]+)/);
-        const view = rtext.match(/조회\s*([\d,]+)/);
-        return {
-            id: li.id || null,
-            title: txt('[class*="UserPostContents_title"]'),
-            content: txt('[class*="UserPostContents_description"]'),
-            author: (txt('[class*="Profile_nickname"]') || '').replace('작성자', '').trim(),
-            timeText: (txt('[class*="Profile_time"]') || '').replace('작성일', '').replace(/\s+/g, ' ').trim(),
-            likes: 0,
-            comments: comment ? num(comment[1]) : 0,
-            views: view ? num(view[1]) : 0,
-            url: url,
-            scrapedAt: new Date().toISOString(),
-        };
-    }), request.url);
-    return { url: request.url, posts };
+    const code = (request.url.match(/itemCode=(\d{6})/) || request.url.match(/stock\/(\d{6})/) || [])[1];
+    if (!code) return { url: request.url, posts: [] };
+    const days = Number(new URL(request.url).searchParams.get('days') || 10);
+    const maxPages = 600, pageSize = 100, perDay = 80;
+    const kstNow = new Date(Date.now() + 9 * 3600 * 1000);
+    const cutoff = new Date(kstNow.getTime() - days * 86400 * 1000).toISOString().slice(0, 19);
+    const buckets = {};
+    const seen = new Set();
+    let offset = null;
+    for (let i = 0; i < maxPages; i++) {
+        const params = new URLSearchParams({
+            discussionType: 'domesticStock', itemCode: code, pageSize: String(pageSize),
+            isHolderOnly: 'false', excludesItemNews: 'false', isItemNewsOnly: 'false',
+        });
+        if (offset) params.set('offset', offset);
+        const res = await page.evaluate(async (url) => {
+            const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            return r.ok ? r.json() : null;
+        }, `/front-api/discussion/list?${params.toString()}`);
+        const batch = (res && res.result && res.result.posts) || [];
+        if (!batch.length) break;
+        for (const p of batch) {
+            const day = (p.writtenAt || '').slice(0, 10);
+            if (!day || seen.has(p.id)) continue;
+            seen.add(p.id);
+            buckets[day] = buckets[day] || [];
+            if (buckets[day].length >= perDay) continue;
+            buckets[day].push({
+                id: p.id,
+                title: p.title,
+                content: p.contentSwReplacedButImg || p.contentSwReplaced || '',
+                author: (p.writer && p.writer.nickname) || null,
+                date: p.writtenAt,
+                likes: p.recommendCount || 0,
+                dislikes: p.notRecommendCount || 0,
+                views: p.viewCount || 0,
+                comments: 0,
+                url: `https://m.stock.naver.com/domestic/stock/${code}/discussion`,
+            });
+        }
+        const oldest = batch[batch.length - 1].writtenAt;
+        if (oldest && oldest < cutoff) break;
+        const next = res && res.result && res.result.lastOffset;
+        if (!next || next === offset) break;
+        offset = next;
+        await new Promise((r) => setTimeout(r, 150));
+    }
+    return { url: request.url, posts: Object.values(buckets).flat() };
 }
 """
 
@@ -86,9 +111,8 @@ def build_run_input(source: str, cfg: dict[str, Any], exchange: str, assets: tup
         }
     if source == "naver_discussion":
         urls = [
-            {"url": cfg["board_url"].format(code=a.code, page=p)}
+            {"url": cfg["board_url"].format(code=a.code) + f"&days={social_days}"}
             for a in assets
-            for p in range(1, cfg["pages"] + 1)
         ]
         return {
             "startUrls": urls,
@@ -97,6 +121,7 @@ def build_run_input(source: str, cfg: dict[str, Any], exchange: str, assets: tup
             "maxConcurrency": 1,
             "maxRequestRetries": 2,
             "pageLoadTimeoutSecs": 90,
+            "pageFunctionTimeoutSecs": 900,
             "waitUntil": "domcontentloaded",
         }
     if source == "blind":
@@ -155,7 +180,7 @@ def _ticker_from_url(url: Any, assets: tuple[Asset, ...], source: str) -> str | 
     """Naver boards are per-ticker, so the URL code is authoritative (titles rarely name the stock)."""
     if source != "naver_discussion" or not url:
         return None
-    match = re.search(r"/stock/(\d{6})", str(url))
+    match = re.search(r"/stock/(\d{6})", str(url)) or re.search(r"itemCode=(\d{6})", str(url))
     if not match:
         return None
     return next((a.ticker for a in assets if a.code == match.group(1)), None)
@@ -194,6 +219,9 @@ def _naver_time(text: str | None, scraped_at: str | None) -> pd.Timestamp | None
     t = re.sub(r"\s+", " ", str(text).replace("작성일", "")).strip()
     if _NAVER_DATE.match(t):
         return _timestamp(t)
+    iso = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", t)
+    if iso:
+        return pd.Timestamp(iso.group(1)).tz_localize("Asia/Seoul").tz_convert("UTC")
 
     rel = re.match(r"(\d+)\s*(분|시간|일)\s*전", t)
     if rel:
