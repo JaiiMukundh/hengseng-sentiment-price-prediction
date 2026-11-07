@@ -58,35 +58,39 @@ sources:
     exchanges: [HKEX]
     actor: claude_code_reviewer~lihkg-scraper
     max_items: 100
-    date_from: 10d
+    date_from: 2w
     max_charge_usd: 3
-  # Social source 2 for HKEX (Telegram keyword search across public channels)
+  # Social source 2 (Telegram keyword search, per-exchange discovery bias)
   telegram:
     enabled: true
-    exchanges: [HKEX]
+    exchanges: [HKEX, KRX]
     actor: parseforge~telegram-keyword-search-scraper
     max_items: 200
     after_date: "10 days"
-    discovery_language: zh-HK
-    discovery_country: hk
-    # Optional: extra public channels searched on top of auto-discovery. Leave empty.
+    discovery:
+      HKEX: {language: zh-TW, country: hk}
+      KRX: {language: ko, country: kr}
+    # Optional: extra public channels searched on top of auto-discovery.
     channels:
       HKEX: []
+      KRX: []
     max_charge_usd: 3
   # Social source 1 for KRX (Naver Finance stock discussion board, JS-rendered)
   naver_discussion:
     enabled: true
     exchanges: [KRX]
     actor: apify~playwright-scraper
-    board_url: "https://finance.naver.com/item/board.naver?code={code}&page={page}"
-    pages: 5
+    board_url: "https://m.stock.naver.com/domestic/stock/{code}/discussion?page={page}"
+    pages: 2
     max_charge_usd: 3
-  # Social source 2 for KRX (Blind keyword search; Korean feed)
+  # Optional KRX source (English TeamBlind). Kept disabled by default: its keyword search returns
+  # relevance-ranked posts that are usually older than the 10-day window, and the Actor does not
+  # support Blind's Korean /kr/ site.
   blind:
-    enabled: true
+    enabled: false
     exchanges: [KRX]
     actor: hypebridge~blind-post-scraper
-    search_url: "https://www.teamblind.com/kr/search/{query}"
+    search_url: "https://www.teamblind.com/search/{query}"
     max_items: 100            # $18 per 1,000 posts on this Actor - keep it tight
     max_charge_usd: 3
 

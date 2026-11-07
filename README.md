@@ -30,9 +30,9 @@ Assets, keywords and exchange calendars live in `config.yaml`.
 | Exchange | Source | Apify Actor ID | Actor input |
 |---|---|---|---|
 | HKEX | LIHKG forum keyword search | `claude_code_reviewer~lihkg-scraper` (`pwCnD34epqg3YfeMB`) | `mode: search`, `keywords`, `maxItems`, `dateFrom` |
-| HKEX | Telegram keyword search (public channels) | `parseforge~telegram-keyword-search-scraper` | `keywords` (tickers, cashtags, names), `discoverChannels: true`, `afterDate`, discovery language/country `zh-HK`/`hk` |
-| KRX | Naver Finance stock discussion board (종목토론실) | `apify~playwright-scraper` with the custom `pageFunction` in `sentpred/sources.py` | `startUrls` (one per asset per page) |
-| KRX | Blind (Korean feed, keyword search) | `hypebridge~blind-post-scraper` (`h4IM5lZDxLlFcQ3yx`) | `startUrls` (search URL per asset), `maxItems` |
+| HKEX + KRX | Telegram keyword search across public channels | `parseforge~telegram-keyword-search-scraper` | `keywords` (tickers, cashtags, names), `discoverChannels: true`, `afterDate`, per-exchange discovery bias (`zh-TW`/`hk`, `ko`/`kr`) |
+| KRX | Naver Finance stock discussion board (종목토론실) | `apify~playwright-scraper` with the custom `pageFunction` in `sentpred/sources.py` | `startUrls` (one per asset per page), `waitUntil: domcontentloaded`, serial concurrency |
+| KRX (optional, disabled) | Blind (English TeamBlind site) | `hypebridge~blind-post-scraper` (`h4IM5lZDxLlFcQ3yx`) | `startUrls` (`/search/<query>`), `maxItems` |
 
 Each run is capped with `maxTotalChargeUsd` (`max_charge_usd` in `config.yaml`). The cap is passed as a query parameter, not in the Actor input.
 
@@ -41,16 +41,16 @@ Each run is capped with `maxTotalChargeUsd` (`max_charge_usd` in `config.yaml`).
 | Source | Price | Volume in one run | Estimated cost |
 |---|---|---|---|
 | LIHKG | $2.00 / 1,000 items | 10 keywords x up to 100 items | <= $2.00 |
-| Telegram search | $2.80 / 1,000 messages | up to 200 messages | <= $0.56 |
-| Naver (Playwright) | pay per usage | 25 page loads | ~$0.05-0.20 |
-| Blind | $18.00 / 1,000 posts | up to 100 posts | <= $1.80 |
-| Exa news | per Exa credits | 50 searches | free credits / plan |
+| Telegram search (2 exchanges) | $2.80 / 1,000 messages | up to 200 messages per exchange | <= $1.12 |
+| Naver (Playwright) | pay per usage | 10 page loads | ~$0.02-0.05 |
+| Blind (disabled by default) | $18.00 / 1,000 posts | up to 100 posts | <= $1.80 if enabled |
+| Exa news | per Exa credits | 10 searches x 10 results | free credits / plan |
 
-About **$4.50-5.00 per full run** at these caps, with a hard worst-case cap of $12 reserved across the four Actors. Reduce `max_items` or disable a source to spend less.
+About **$3.20 per full run** with Blind disabled, and a hard worst-case cap of $9 reserved across the three enabled Actors.
 
 ### News source
 
-Exa (`POST https://api.exa.ai/search`, `category: news`, `startPublishedDate` set to the look-back window, highlights returned). Tavily is not used, so no Tavily key is needed.
+Exa (`POST https://api.exa.ai/search`) following the `build-with-exa` skill: `query` + `objective` + `contents.highlights: true`, with `startPublishedDate` because the brief enforces a 10-day window. No highlight budgets or domain filters. Tavily is not used, so no Tavily key is needed.
 
 ## Features and model
 
@@ -97,10 +97,20 @@ cp .env.example .env          # then fill in APIFY_API_TOKEN and EXA_API_KEY
 
 Keys are read from the environment or `.env`. Never commit `.env`. `data/` (raw scrapes) is git-ignored because it can contain usernames.
 
-### Configuration to complete before a live run
+### Operational notes for live runs
 
-1. **Blind search URL.** `sources.blind.search_url` is a template. Check the URL pattern on the first run, because Blind's Korean search path can change.
-2. **Naver selectors.** The board renders client-side. `NAVER_PAGE_FUNCTION` in `sentpred/sources.py` targets the classic `table.type2` layout and must be checked on a live run. Set `pages: 1` in `config.yaml` for a first test, and inspect the raw output in `data/raw/naver_discussion_KRX.json`.
+1. **Naver.** The board is a client-rendered Next.js app, so it is scraped with Playwright (`waitUntil: domcontentloaded`, serial page loads). The parser matches stable class-name prefixes and was verified against the live page in Nov 2026. Each board exposes the latest ~50 posts per page; `?page=` does not reliably reach older posts. **Naver therefore yields a real-time sample per run, and history grows across daily runs.** Naver's like counter is Lottie-animated and not exposed in the DOM, so Naver engagement uses views and comments; likes come from the other sources.
+2. **Blind.** The only available Actor supports the English `teamblind.com` site and skips localized `/kr/` paths. Its keyword search is relevance-ranked, so most hits fall outside the 10-day window. Blind is therefore disabled by default; enable it if you want long-horizon English TeamBlind posts.
+3. **Telegram.** Channel discovery is a web search restricted to `t.me` and is best-effort. Add public channel handles under `sources.telegram.channels.<exchange>` to guarantee they are searched.
+4. **Raw cache.** `python -m sentpred scrape --reuse-raw` rebuilds the post table from `data/raw/*.json` without paying to re-scrape.
+
+## Results snapshot (2026-11-07)
+
+Live run, both exchanges, 10-day window: **402 social posts** (LIHKG 8, Telegram 38, Naver 356) and **100 Exa news items** across 10 assets, mapped to 7 trading sessions with sentiment coverage.
+
+- Social sentiment (combined with news in the report): bearish on HK tech (Meituan -0.67, Alibaba -0.43, Xiaomi -0.36, Tencent -0.27), neutral to mildly bearish in Korea (Kakao -0.17; Samsung, SK hynix, NAVER, Hyundai near neutral).
+- Model, out-of-sample over 1,685 pooled rows: naive baseline MAPE **2.656%**; `ridge_price` **2.673%** (direction 52.4%); `ridge_sent` **2.679%**. The sentiment model is not yet trainable with 7 sessions of history, so it has no meaningful weights and the report says so. No edge over the baseline yet, reported honestly.
+- Snapshot: [`reports/live/index.html`](reports/live/index.html) (self-contained; no usernames or raw posts).
 
 ## Running it daily
 
@@ -118,6 +128,9 @@ Social sentiment is only available for the look-back window, so a single run giv
 - **Model.** It is a linear model on a small sample. The expected edge is small, and the report shows whether it beats the naive baseline.
 - **Calendars.** Exchange holidays are not modelled. Sessions are the price bars plus the next business day.
 - **Telegram** coverage depends on its channel discovery (a web search restricted to `t.me`). You can add specific public channels in `config.yaml` to guarantee they are searched.
+- **Naver** yields the board's latest ~50 posts per page per run (real-time sample), not a full 10 days in one pass. Daily runs accumulate history.
+- **Blind** is optional and disabled: the available Actor supports only the English TeamBlind site, and its relevance-ranked search rarely returns posts within 10 days.
+- **Follower counts** are available from Telegram (`channelSubscribers`) but not from LIHKG or Naver, so reach weighting is strongest there.
 
 ## Repository layout
 
@@ -127,15 +140,16 @@ sentpred/
   config.py              config loading, .env
   apify.py               Apify REST client (run, poll, dataset download, cost cap)
   sources.py             Actor input builders and normalizers per source
-  news.py                Exa news search
+  news.py                Exa news search (query + objective + highlights)
   prices.py              yfinance daily bars
-  sentiment.py           bilingual lexicon scorer and asset keyword matcher
+  sentiment.py           Chinese/English/Korean lexicon scorer and keyword matcher
   align.py               UTC to session mapping and per-ticker aggregation
   features.py            technical features and the joined dataset
   levels.py              pivots and clustered swing support/resistance
   model.py               walk-forward validation, metrics, live forecast
   report.py              HTML and PNG report
   cli.py                 command line stages
-tests/                   unit tests (run offline)
+tests/                   29 unit tests (run offline)
 reports/demo/            demo report built from synthetic data
+reports/live/            sanitized snapshot of the 2026-11-07 live run
 ```

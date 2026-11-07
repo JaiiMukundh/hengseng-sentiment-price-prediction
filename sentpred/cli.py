@@ -45,10 +45,18 @@ class Paths:
 def _read(path: Path, parse_dates: list[str], columns: list[str] | None = None) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame(columns=columns or [])
-    return pd.read_csv(path, parse_dates=parse_dates)
+    df = pd.read_csv(path)
+    for col in parse_dates:
+        if col not in df.columns:
+            continue
+        if col == "date":  # price bars stay naive exchange-local dates
+            df[col] = pd.to_datetime(df[col], format="mixed")
+        else:
+            df[col] = pd.to_datetime(df[col], utc=True, format="mixed")
+    return df
 
 
-def stage_scrape(cfg: Config, paths: Paths) -> None:
+def stage_scrape(cfg: Config, paths: Paths, reuse_raw: bool = False) -> None:
     from .apify import ApifyError, run_actor
     from .sources import build_run_input, normalize
 
@@ -62,20 +70,29 @@ def stage_scrape(cfg: Config, paths: Paths) -> None:
             continue
         for exchange in src["exchanges"]:
             assets = cfg.assets_for(exchange)
-            run_input = build_run_input(name, src, exchange, assets, window)
-            if run_input is None:
-                continue
-            try:
-                items = run_actor(src["actor"], run_input, token, max_charge_usd=src.get("max_charge_usd"))
-            except ApifyError as exc:
-                log.error("%s/%s failed: %s", name, exchange, exc)
-                continue
-            (paths.raw / f"{name}_{exchange}.json").write_text(
-                json.dumps(items, ensure_ascii=False, default=str), encoding="utf-8")
+            raw_path = paths.raw / f"{name}_{exchange}.json"
+            if reuse_raw and raw_path.exists():
+                items = json.loads(raw_path.read_text(encoding="utf-8"))
+                log.info("%s/%s: reusing %d cached items from %s", name, exchange, len(items), raw_path.name)
+            else:
+                run_input = build_run_input(name, src, exchange, assets, window)
+                if run_input is None:
+                    continue
+                try:
+                    items = run_actor(src["actor"], run_input, token, max_charge_usd=src.get("max_charge_usd"))
+                except ApifyError as exc:
+                    log.error("%s/%s failed: %s", name, exchange, exc)
+                    continue
+                raw_path.write_text(json.dumps(items, ensure_ascii=False, default=str), encoding="utf-8")
             df = normalize(name, exchange, items, assets)
             log.info("%s/%s: %d raw items -> %d asset-matched posts", name, exchange, len(items), len(df))
             frames.append(df)
     new = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=POST_COLUMNS)
+    if not new.empty:
+        cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=window)
+        before = len(new)
+        new = new[new["published_utc"] >= cutoff]
+        log.info("window filter: kept %d/%d posts published in the last %d days", len(new), before, window)
     _append(paths.posts, new)
 
 
@@ -232,10 +249,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--config", default=str(ROOT / "config.yaml"))
     parser.add_argument("--demo", action="store_true", help="write outputs under data/demo and reports/demo")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name in ("scrape", "news", "prices", "model", "report", "run", "demo"):
-        sub.add_parser(name)
+    commands = {name: sub.add_parser(name) for name in
+                ("scrape", "news", "prices", "model", "report", "run", "demo")}
+    commands["scrape"].add_argument("--reuse-raw", action="store_true",
+                                    help="reuse cached data/raw/<source>_<exchange>.json instead of paying to re-scrape")
     args = parser.parse_args(argv)
-
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config(args.config)
     if args.demo or args.cmd == "demo":
@@ -247,7 +265,7 @@ def main(argv: list[str] | None = None) -> None:
         print(run_demo(cfg, paths))
         return
     if args.cmd == "scrape":
-        stage_scrape(cfg, paths)
+        stage_scrape(cfg, paths, reuse_raw=args.reuse_raw)
     elif args.cmd == "news":
         stage_news(cfg, paths)
     elif args.cmd == "prices":

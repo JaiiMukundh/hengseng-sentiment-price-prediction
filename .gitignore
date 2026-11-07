@@ -8,3 +8,4 @@ data/
 reports/*
 !reports/demo/
 .DS_Store
+!reports/live/

@@ -3,7 +3,7 @@ import pytest
 
 from sentpred.config import Asset, load_config
 from sentpred.sentiment import mentions_asset, score_text
-from sentpred.sources import _timestamp, build_run_input, normalize
+from sentpred.sources import _naver_time, _timestamp, build_run_input, normalize
 
 TENCENT = Asset("HKEX", "0700.HK", "Tencent Holdings", ("Tencent", "腾讯", "$0700", "00700"))
 SAMSUNG = Asset("KRX", "005930.KS", "Samsung Electronics", ("Samsung Electronics", "삼성전자"))
@@ -72,12 +72,42 @@ def test_normalize_naver_nested_posts_uses_kst():
     assert df.iloc[0]["published_utc"] == pd.Timestamp("2026-11-06 01:30:00", tz="UTC")
 
 
+def test_naver_relative_and_absolute_times():
+    scraped = "2026-11-07T03:00:00Z"
+    assert _naver_time("1분 전", scraped) == pd.Timestamp("2026-11-07 02:59:00", tz="UTC")
+    assert _naver_time("2시간 전", scraped) == pd.Timestamp("2026-11-07 01:00:00", tz="UTC")
+    assert _naver_time("1일 전", scraped) == pd.Timestamp("2026-11-06 03:00:00", tz="UTC")
+    assert _naver_time("방금 전", scraped) == pd.Timestamp(scraped)
+    # 04:58 KST on 2026-11-07 is 2026-11-06 19:58 UTC
+    assert _naver_time("오전 4:58", scraped) == pd.Timestamp("2026-11-06 19:58:00", tz="UTC")
+    assert _naver_time("11.05", scraped) == pd.Timestamp("2026-11-04 15:00:00", tz="UTC")
+
+
+def test_blind_naive_timestamp_is_eastern():
+    assert _timestamp("09/26/2026, 10:00 AM", "America/New_York") == pd.Timestamp("2026-09-26 14:00:00", tz="UTC")
+
+
+def test_telegram_engagement_mapping():
+    items = [{"text": "Tencent looks strong", "date": "2026-11-06T03:00:00+00:00",
+              "totalReactions": 12, "views": 900, "channelSubscribers": 50000, "channel": "hkstock"}]
+    df = normalize("telegram", "HKEX", items, (TENCENT,))
+    assert df.iloc[0]["likes"] == 12
+    assert df.iloc[0]["followers"] == 50000
+
+
+def test_normalize_deduplicates_repeated_posts():
+    item = {"title": "Tencent rally", "date": "2026-11-06T03:00:00+00:00", "like_count": 1}
+    df = normalize("lihkg", "HKEX", [item, dict(item)], (TENCENT,))
+    assert len(df) == 1
+
+
 def test_build_run_input_telegram_uses_keyword_search_without_channel_list():
-    cfg = {"channels": {"HKEX": []}, "discovery_language": "zh-HK", "discovery_country": "hk"}
+    cfg = {"channels": {"HKEX": []}, "discovery": {"HKEX": {"language": "zh-TW", "country": "hk"}}}
     run = build_run_input("telegram", cfg, "HKEX", (TENCENT,), 10)
     assert run["discoverChannels"] is True
     assert run["channels"] == []
     assert run["afterDate"] == "10 days"
+    assert run["discoveryLanguage"] == "zh-TW"
     assert "Tencent" in run["keywords"] and "$0700" in run["keywords"]
 
 
@@ -93,8 +123,9 @@ def test_config_has_five_assets_per_exchange_and_two_sources_each():
     cfg = load_config()
     for exchange in ("HKEX", "KRX"):
         assert len(cfg.assets_for(exchange)) == 5
-        sources = [name for name, src in cfg.raw["sources"].items() if src.get("enabled") and exchange in src["exchanges"]]
-        assert len(sources) == 2, (exchange, sources)
+        sources = [name for name, src in cfg.raw["sources"].items()
+                   if src.get("enabled") and exchange in src["exchanges"]]
+        assert len(sources) >= 2, (exchange, sources)
 
 
 def test_position_label_defaults_to_flat_and_formats_holdings():

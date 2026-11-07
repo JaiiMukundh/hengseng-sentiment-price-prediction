@@ -41,6 +41,7 @@ def run_actor(
         _raise(status_resp)
         run = status_resp.json()["data"]
         if run["status"] == "SUCCEEDED":
+            log.info("run %s finished; usageTotalUsd=%s", run_id, run.get("usageTotalUsd"))
             break
         if run["status"] in {"FAILED", "ABORTED", "TIMED-OUT"}:
             raise ApifyError(f"{actor_id} run {run_id} ended with {run['status']}")

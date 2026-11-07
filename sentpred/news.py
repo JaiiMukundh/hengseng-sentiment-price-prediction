@@ -1,4 +1,9 @@
-"""News sentiment input via Exa (https://exa.ai) neural search, restricted to the look-back window."""
+"""News sentiment input via Exa (https://exa.ai) neural search, restricted to the look-back window.
+
+Request shape follows Exa's build-with-exa guidance: query + highlights, no highlight budgets,
+no numResults/category unless needed. The 10-day window is a hard task requirement, so
+startPublishedDate is set. `objective` frames the search as one step of the forecasting pipeline.
+"""
 
 from __future__ import annotations
 
@@ -15,18 +20,22 @@ EXA_URL = "https://api.exa.ai/search"
 log = logging.getLogger(__name__)
 
 
-def fetch_news(assets: tuple[Asset, ...], api_key: str, days: int, num_results: int) -> pd.DataFrame:
+def fetch_news(assets: tuple[Asset, ...], api_key: str, days: int, num_results: int = 10) -> pd.DataFrame:
     start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     rows = []
     for asset in assets:
         body = {
-            "query": f"{asset.name} ({asset.ticker}) stock news",
-            "type": "auto",
-            "category": "news",
-            "numResults": num_results,
+            "query": f"latest news about {asset.name} ({asset.ticker}) stock",
+            "objective": (
+                f"Find recent, price-relevant news about {asset.name} ({asset.ticker}) for a next-session "
+                f"stock forecast. Rank reputable financial outlets and company announcements first; "
+                f"exclude other companies with similar names and unrelated market roundups."
+            ),
+            "contents": {"highlights": True},
             "startPublishedDate": start,
-            "contents": {"highlights": {"maxCharacters": 1000}},
         }
+        if num_results != 10:
+            body["numResults"] = num_results
         resp = requests.post(EXA_URL, headers={"x-api-key": api_key, "Content-Type": "application/json"},
                              json=body, timeout=60)
         if resp.status_code >= 400:
