@@ -63,6 +63,8 @@ def aggregate(posts: pd.DataFrame, calendars: dict[str, tuple[str, str, pd.Datet
 
     scored = df["text"].map(score_text)
     df["sent"] = [s for s, _ in scored]
+    df["hits"] = [h for _, h in scored]
+    df["hit"] = (df["hits"] > 0).astype(float)
     df["w"] = engagement_weight(df)
     df["ws"] = df["w"] * df["sent"]
     df["pos"] = (df["sent"] > 0).astype(float)
@@ -77,5 +79,18 @@ def aggregate(posts: pd.DataFrame, calendars: dict[str, tuple[str, str, pd.Datet
         f"{prefix}pos_share": grouped["pos"].mean(),
         f"{prefix}neg_share": grouped["neg"].mean(),
         f"{prefix}eng_log": grouped["eng"].sum(),
+        f"{prefix}hit_share": grouped["hit"].mean(),
     }).reset_index()
+
+    hit = df[df["hit"] > 0]
+    if not hit.empty:
+        hg = hit.groupby(["ticker", "date"])
+        out = out.merge(pd.DataFrame({
+            f"{prefix}sent_mean_hit": hg["sent"].mean(),
+            f"{prefix}sent_wmean_hit": hg["ws"].sum() / hg["w"].sum(),
+        }).reset_index(), on=["ticker", "date"], how="left")
+    for col in (f"{prefix}sent_mean_hit", f"{prefix}sent_wmean_hit"):
+        if col not in out:
+            out[col] = 0.0
+        out[col] = out[col].fillna(0.0)
     return out

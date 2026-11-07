@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -20,8 +21,12 @@ from .features import PRICE_FEATURES, SENTIMENT_FEATURES, SENTIMENT_MODEL_FEATUR
 MODELS = {"ridge_price": PRICE_FEATURES, "ridge_sent": PRICE_FEATURES + SENTIMENT_FEATURES}
 
 
-def _fit(features: list[str], train: pd.DataFrame, alpha: float):
-    model = make_pipeline(StandardScaler(), Ridge(alpha=alpha))
+def _fit(features: list[str], train: pd.DataFrame, alpha: float, model_name: str = "ridge"):
+    if model_name == "rf":
+        model = make_pipeline(StandardScaler(), RandomForestRegressor(
+            n_estimators=300, max_depth=2, min_samples_leaf=5, random_state=1, n_jobs=-1))
+    else:
+        model = make_pipeline(StandardScaler(), Ridge(alpha=alpha))
     model.fit(train[features], train["y_next_ret"])
     return model
 
@@ -56,7 +61,8 @@ def _sentiment_rows(df: pd.DataFrame) -> pd.DataFrame:
     return data[data["date"].isin(covered)].reset_index(drop=True)
 
 
-def leave_one_session_out(df: pd.DataFrame, alpha: float, shrink: float = 1.0) -> tuple[pd.DataFrame, int]:
+def leave_one_session_out(df: pd.DataFrame, alpha: float, shrink: float = 1.0,
+                          model_name: str = "rf") -> tuple[pd.DataFrame, int]:
     """Pooled panel validation when sentiment history is too short for an expanding window.
 
     Each fold holds out one trading session (all tickers) and trains on every other session.
@@ -72,28 +78,41 @@ def leave_one_session_out(df: pd.DataFrame, alpha: float, shrink: float = 1.0) -
         for session in dates:
             train = out[out["date"] != session]
             test = out["date"] == session
-            out.loc[test, f"pred_{name}"] = _fit(features, train, alpha).predict(out.loc[test, features])
+            estimator = model_name if name == "ridge_sent" else "ridge"
+            out.loc[test, f"pred_{name}"] = _fit(features, train, alpha, estimator).predict(out.loc[test, features])
     out["pred_ridge_sent"] = out["pred_ridge_sent"] * shrink
     return out.dropna(subset=["pred_ridge_price", "pred_ridge_sent"]).reset_index(drop=True), len(dates)
 
 
 def sentiment_coefficients(df: pd.DataFrame, alpha: float) -> pd.DataFrame:
-    """Standardized Ridge coefficients for the sentiment model, fitted on all sentiment rows."""
+    """Standardized Ridge coefficients, kept as a linear reference for interpretation."""
     data = _sentiment_rows(df)
     if data.empty:
         return pd.DataFrame(columns=["feature", "coefficient"])
-    model = _fit(SENTIMENT_MODEL_FEATURES, data, alpha)
+    model = _fit(SENTIMENT_MODEL_FEATURES, data, alpha, "ridge")
     coefficients = model.named_steps["ridge"].coef_
     out = pd.DataFrame({"feature": SENTIMENT_MODEL_FEATURES, "coefficient": coefficients})
     return out.reindex(out["coefficient"].abs().sort_values(ascending=False).index).reset_index(drop=True)
 
 
-def sentiment_forecast(df: pd.DataFrame, alpha: float, shrink: float = 1.0) -> pd.DataFrame:
+def sentiment_importances(df: pd.DataFrame, model_name: str = "rf") -> pd.DataFrame:
+    """Feature importances for the non-linear short-history model."""
+    data = _sentiment_rows(df)
+    if data.empty:
+        return pd.DataFrame(columns=["feature", "importance"])
+    model = _fit(SENTIMENT_MODEL_FEATURES, data, 50, model_name)
+    importances = model.named_steps["randomforestregressor"].feature_importances_
+    out = pd.DataFrame({"feature": SENTIMENT_MODEL_FEATURES, "importance": importances})
+    return out.sort_values("importance", ascending=False).reset_index(drop=True)
+
+
+def sentiment_forecast(df: pd.DataFrame, alpha: float, shrink: float = 1.0,
+                       model_name: str = "rf") -> pd.DataFrame:
     """Fit the sentiment model on all sentiment rows and predict the next session for each ticker."""
     data = _sentiment_rows(df)
     if data.empty:
         return pd.DataFrame(columns=["ticker", "pred_sent_ret", "pred_sent_price"])
-    fitted = _fit(SENTIMENT_MODEL_FEATURES, data, alpha)
+    fitted = _fit(SENTIMENT_MODEL_FEATURES, data, alpha, model_name)
     latest = df.sort_values("date").groupby("ticker").tail(1).copy()
     latest["pred_sent_ret"] = fitted.predict(latest[SENTIMENT_MODEL_FEATURES]) * shrink
     latest["pred_sent_price"] = latest["close"] * (1 + latest["pred_sent_ret"])
@@ -102,27 +121,32 @@ def sentiment_forecast(df: pd.DataFrame, alpha: float, shrink: float = 1.0) -> p
 
 def nested_sentiment_predictions(df: pd.DataFrame, alphas: tuple[float, ...] = (10, 30, 50, 100, 300),
                                  shrink: float = 0.5) -> pd.DataFrame:
-    """Sensitivity check: choose alpha by inner leave-one-session-out inside each outer fold."""
+    """Sensitivity check: choose model family and alpha by inner leave-one-session-out."""
     data = _sentiment_rows(df)
     out = data.copy()
     out["pred_ridge_sent"] = np.nan
+    candidates = [("ridge", alpha) for alpha in alphas] + [("rf", 0.0)]
     for session in sorted(data["date"].unique()):
         train = data[data["date"] != session].reset_index(drop=True)
         test = data[data["date"] == session]
-        best_alpha, best_mape = alphas[0], np.inf
-        for alpha in alphas:
+        best = candidates[0]
+        best_mape = np.inf
+        for model_name, alpha in candidates:
             inner = np.zeros(len(train))
             for inner_session in sorted(train["date"].unique()):
                 inner_train = train[train["date"] != inner_session]
                 inner_test = train["date"] == inner_session
-                inner[inner_test.values] = _fit(SENTIMENT_MODEL_FEATURES, inner_train, alpha).predict(
+                inner[inner_test.values] = _fit(
+                    SENTIMENT_MODEL_FEATURES, inner_train, alpha, model_name).predict(
                     train.loc[inner_test, SENTIMENT_MODEL_FEATURES])
             mape = ((train["close"] * (1 + shrink * inner) - train["next_close"]).abs()
                     / train["next_close"]).mean()
             if mape < best_mape:
-                best_alpha, best_mape = alpha, mape
+                best, best_mape = (model_name, alpha), mape
+        model_name, alpha = best
         out.loc[test.index, "pred_ridge_sent"] = (
-            _fit(SENTIMENT_MODEL_FEATURES, train, best_alpha).predict(test[SENTIMENT_MODEL_FEATURES]) * shrink)
+            _fit(SENTIMENT_MODEL_FEATURES, train, alpha, model_name).predict(
+                test[SENTIMENT_MODEL_FEATURES]) * shrink)
     return out
 
 

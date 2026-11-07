@@ -65,7 +65,8 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
                  forecasts: pd.DataFrame, levels: dict[str, dict], metrics: pd.DataFrame,
                  preds: pd.DataFrame, short_metrics: pd.DataFrame | None = None,
                  coefficients: pd.DataFrame | None = None, banner: str | None = None,
-                 nested_metrics: pd.DataFrame | None = None) -> Path:
+                 nested_metrics: pd.DataFrame | None = None,
+                 importances: pd.DataFrame | None = None) -> Path:
     charts = out_dir / "charts"
     charts.mkdir(parents=True, exist_ok=True)
     summary = summary_table(cfg, prices, posts, news, forecasts, levels)
@@ -118,9 +119,11 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
             "is evidence that the sentiment features carry fitted weights, not a statistically robust backtest.</p>"
             f"{_table(short_metrics.round(3))}"
             f"{nested_html}"
-            "<h3>Standardized coefficients</h3>"
-            "<p class='note'>Standardized Ridge coefficients; larger absolute values mean the feature moves the "
-            "predicted next-session return more.</p>"
+            "<h3>Feature importances (Random Forest)</h3>"
+            "<p class='note'>How much each feature contributes to the short-history model's splits.</p>"
+            f"{_table(importances.round(4))}"
+            "<h3>Ridge coefficients (linear reference)</h3>"
+            "<p class='note'>Standardized coefficients from the linear reference model; larger absolute values mean the feature moves the predicted next-session return more.</p>"
             f"{_table(coefficients.round(4))}"
         )
     banner_html = f"<div class='banner'>{html.escape(banner)}</div>" if banner else ""

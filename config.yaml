@@ -102,6 +102,7 @@ model:
   test_block: 5              # sessions per out-of-sample block
   ridge_alpha: 1.0
   sentiment_alpha: 50.0    # strong shrinkage for the 60-row short-history sentiment panel
+  sentiment_model: rf      # rf = small Random Forest; ridge = linear reference
   sentiment_shrinkage: 0.5 # calibrate noisy forecasts toward zero
   signal_threshold: 0.005    # |predicted return| above this -> LONG / SHORT, otherwise FLAT
   sentiment_direction: 0.1   # |sentiment score| above this -> BULLISH / BEARISH

@@ -41,6 +41,10 @@ class Paths:
     def prices(self) -> Path:
         return self.processed / "prices.csv"
 
+    @property
+    def market(self) -> Path:
+        return self.processed / "market.csv"
+
 
 def _read(path: Path, parse_dates: list[str], columns: list[str] | None = None) -> pd.DataFrame:
     if not path.exists():
@@ -116,15 +120,20 @@ def _append(path: Path, new: pd.DataFrame) -> None:
 
 
 def stage_prices(cfg: Config, paths: Paths) -> None:
-    from .prices import fetch_prices
+    from .prices import fetch_market, fetch_prices
 
-    df = fetch_prices(cfg.assets, cfg.raw["window"]["price_period"])
+    period = cfg.raw["window"]["price_period"]
+    df = fetch_prices(cfg.assets, period)
     df.to_csv(paths.prices, index=False)
-    log.info("prices: %d bars for %d tickers", len(df), df["ticker"].nunique())
+    market = fetch_market(period)
+    market.to_csv(paths.market, index=False)
+    log.info("prices: %d bars for %d tickers; market context: %d series",
+             len(df), df["ticker"].nunique(), market["series"].nunique())
 
 
 def stage_model(cfg: Config, paths: Paths) -> dict:
     prices = _read(paths.prices, ["date"])
+    market = _read(paths.market, ["date"])
     posts = _read(paths.posts, ["published_utc"], POST_COLUMNS)
     news = _read(paths.news, ["published_utc"], POST_COLUMNS)
     if prices.empty:
@@ -140,7 +149,7 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
 
     social_agg = align.aggregate(_utc(posts), calendars, "social_")
     news_agg = align.aggregate(_utc(news), calendars, "news_")
-    dataset = features.build_dataset(prices, social_agg, news_agg)
+    dataset = features.build_dataset(prices, social_agg, news_agg, market)
 
     mcfg = cfg.raw["model"]
     preds = model.walk_forward(dataset, mcfg["min_train_dates"], mcfg["test_block"], mcfg["ridge_alpha"])
@@ -151,21 +160,26 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     short_metrics = None
     nested_metrics = None
     coefficients = None
+    importances = None
     if sent_sessions < mcfg["min_train_dates"]:
         sent_alpha = mcfg.get("sentiment_alpha", 50)
         sent_shrink = mcfg.get("sentiment_shrinkage", 0.5)
-        short_preds, short_dates = model.leave_one_session_out(dataset, sent_alpha, sent_shrink)
+        sent_model = mcfg.get("sentiment_model", "rf")
+        short_preds, short_dates = model.leave_one_session_out(
+            dataset, sent_alpha, sent_shrink, sent_model)
         short_metrics = model.evaluate(short_preds)
         nested = model.nested_sentiment_predictions(dataset, shrink=sent_shrink)
         nested = nested.merge(short_preds[["date", "ticker", "pred_ridge_price"]], on=["date", "ticker"], how="left")
         nested["pred_naive"] = 0.0
         nested_metrics = model.evaluate(nested.dropna(subset=["pred_ridge_price", "pred_ridge_sent"]))
         coefficients = model.sentiment_coefficients(dataset, sent_alpha)
+        importances = model.sentiment_importances(dataset, sent_model)
         forecasts = forecasts.merge(
-            model.sentiment_forecast(dataset, sent_alpha, sent_shrink), on="ticker", how="left")
+            model.sentiment_forecast(dataset, sent_alpha, sent_shrink, sent_model), on="ticker", how="left")
         short_metrics.to_csv(paths.processed / "short_history_metrics.csv", index=False)
         nested_metrics.to_csv(paths.processed / "sentiment_nested_metrics.csv", index=False)
         coefficients.to_csv(paths.processed / "sentiment_coefficients.csv", index=False)
+        importances.to_csv(paths.processed / "sentiment_importances.csv", index=False)
         log.info("short-history sentiment model: %d sessions, %d rows; coefficients written",
                  short_dates, len(short_preds))
         log.warning("only %d sessions with social/news history (need %d for a full walk-forward); "
@@ -189,7 +203,8 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
              len(preds), forecasts["model_used"].iloc[0] if len(forecasts) else "n/a")
     return {"prices": prices, "posts": posts, "news": news, "forecasts": forecasts,
             "levels": lvl, "metrics": metrics, "preds": preds, "sent_sessions": sent_sessions,
-            "short_metrics": short_metrics, "nested_metrics": nested_metrics, "coefficients": coefficients}
+            "short_metrics": short_metrics, "nested_metrics": nested_metrics,
+            "coefficients": coefficients, "importances": importances}
 
 
 def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> Path:
@@ -202,7 +217,8 @@ def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> 
     banner = " ".join(filter(None, [banner, coverage]))
     path = write_report(paths.report, cfg, state["prices"], state["posts"], state["news"],
                         state["forecasts"], state["levels"], state["metrics"], state["preds"],
-                        state["short_metrics"], state["coefficients"], banner, state["nested_metrics"])
+                        state["short_metrics"], state["coefficients"], banner, state["nested_metrics"],
+                        state["importances"])
     log.info("report written to %s", path)
     return path
 

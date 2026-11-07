@@ -1,7 +1,8 @@
 """Lexicon-based sentiment for English, Traditional/Simplified Chinese and Korean.
 
 Score is (pos - neg) / (pos + neg) in [-1, 1]; 0 when no sentiment term is found.
-Deliberately transparent and dependency-free. Swap in a multilingual model for production.
+Longest match wins (so "下跌" is not double-counted as "跌"), and a short negation window
+flips nearby terms ("not good", "唔好", "안 좋다"). Deliberately transparent and dependency-free.
 """
 
 from __future__ import annotations
@@ -23,24 +24,56 @@ NEGATIVE = [
     "하락", "급락", "매도", "악재", "하한가", "신저가", "약세", "손실", "적자", "폭락", "공매도", "물려",
 ]
 
+NEGATIONS = [
+    "not", "no", "never", "without", "isn't", "aren't", "wasn't", "won't", "can't", "don't", "doesn't",
+    "不", "沒", "没", "別", "别", "無", "无", "未", "唔", "唔好", "唔係",
+    "안", "못", "없", "아니", "말고", "아닌",
+]
+
 _ASCII_TERM = re.compile(r"^[a-z ]+$")
 
 
-def _count(text: str, terms: list[str]) -> int:
-    total = 0
-    for term in terms:
+def _is_negated(text: str, start: int, window: int = 14) -> bool:
+    context = text[max(0, start - window):start]
+    return any(neg in context for neg in NEGATIONS)
+
+
+def _score(text: str) -> tuple[int, int]:
+    matches: list[tuple[int, int, int]] = []
+    for term, polarity in [(t, 1) for t in POSITIVE] + [(t, -1) for t in NEGATIVE]:
         if _ASCII_TERM.match(term):
-            total += len(re.findall(rf"\b{re.escape(term)}\b", text))
+            spans = [(m.start(), m.end()) for m in re.finditer(rf"\b{re.escape(term)}\b", text)]
         else:
-            total += text.count(term)
-    return total
+            spans, start = [], 0
+            while True:
+                idx = text.find(term, start)
+                if idx == -1:
+                    break
+                spans.append((idx, idx + len(term)))
+                start = idx + len(term)
+        for start, end in spans:
+            sign = -polarity if _is_negated(text, start) else polarity
+            matches.append((start, end, sign))
+
+    # Longest match wins, so "下跌" is not also counted as "跌".
+    matches.sort(key=lambda m: (m[0], -(m[1] - m[0])))
+    pos = neg = 0
+    covered: list[tuple[int, int]] = []
+    for start, end, sign in matches:
+        if any(start < c_end and end > c_start for c_start, c_end in covered):
+            continue
+        covered.append((start, end))
+        if sign > 0:
+            pos += 1
+        else:
+            neg += 1
+    return pos, neg
 
 
 def score_text(text: str) -> tuple[float, int]:
     """Return (sentiment score in [-1, 1], number of sentiment hits)."""
     lowered = (text or "").lower()
-    pos = _count(lowered, POSITIVE)
-    neg = _count(lowered, NEGATIVE)
+    pos, neg = _score(lowered)
     hits = pos + neg
     if hits == 0:
         return 0.0, 0
