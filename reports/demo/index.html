@@ -11,7 +11,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
 .note{color:#555;font-size:13px}
 </style></head><body>
 <h1>HengSeng Sentiment Price Prediction</h1>
-<div class="note">Generated 2026-11-07 19:50 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
+<div class="note">Generated 2026-11-07 20:04 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
 <div class='banner'>DEMO: synthetic data for pipeline testing. Not real market or social data. Current-sentiment tables use the last 10 days; model training uses up to 30 days (6 sessions). Below 60 sessions the pipeline reports a pooled leave-one-session-out model as short-history evidence, not a full walk-forward.</div>
 <h2>Data coverage</h2><p class='note'>The current-sentiment tables use the last 10 days. Model training uses up to 30 days of history; Naver is paginated through its JSON API and sampled at up to 80 posts per ticker per day. The table shows the actual first/last timestamp per feed; matched_rows counts ticker-post pairs, not unique messages.</p><table class="dataframe table">
   <thead>
@@ -28,29 +28,29 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>HKEX</td>
       <td>demo_social</td>
       <td>344</td>
-      <td>2026-10-28 20:57</td>
-      <td>2026-11-07 19:50</td>
+      <td>2026-10-28 21:10</td>
+      <td>2026-11-07 20:03</td>
     </tr>
     <tr>
       <td>KRX</td>
       <td>demo_social</td>
       <td>431</td>
-      <td>2026-10-28 20:21</td>
-      <td>2026-11-07 19:09</td>
+      <td>2026-10-28 20:34</td>
+      <td>2026-11-07 19:22</td>
     </tr>
     <tr>
       <td>HKEX</td>
       <td>exa_news</td>
       <td>66</td>
-      <td>2026-10-29 01:08</td>
-      <td>2026-11-07 19:50</td>
+      <td>2026-10-29 01:21</td>
+      <td>2026-11-07 20:03</td>
     </tr>
     <tr>
       <td>KRX</td>
       <td>exa_news</td>
       <td>89</td>
-      <td>2026-10-28 23:26</td>
-      <td>2026-11-07 17:24</td>
+      <td>2026-10-28 23:39</td>
+      <td>2026-11-07 17:37</td>
     </tr>
   </tbody>
 </table><h2>HKEX</h2><h3>Ranked by social mentions</h3><table class="dataframe table">
@@ -90,8 +90,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>151.0336</td>
       <td>0.14</td>
       <td>FLAT</td>
-      <td>150.7955</td>
-      <td>-0.02</td>
+      <td>150.3792</td>
+      <td>-0.30</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>146.95</td>
@@ -110,8 +110,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>299.2330</td>
       <td>0.04</td>
       <td>FLAT</td>
-      <td>298.7486</td>
-      <td>-0.12</td>
+      <td>298.8136</td>
+      <td>-0.10</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>295.48, 291.10</td>
@@ -130,8 +130,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>180.8441</td>
       <td>0.03</td>
       <td>FLAT</td>
-      <td>180.6338</td>
-      <td>-0.09</td>
+      <td>180.4940</td>
+      <td>-0.16</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>174.89, 171.56</td>
@@ -150,8 +150,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>273.3895</td>
       <td>-0.04</td>
       <td>FLAT</td>
-      <td>273.3011</td>
-      <td>-0.08</td>
+      <td>272.9609</td>
+      <td>-0.20</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>266.77, 261.68</td>
@@ -170,8 +170,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>34.1229</td>
       <td>-0.14</td>
       <td>FLAT</td>
-      <td>34.2755</td>
-      <td>0.30</td>
+      <td>34.1956</td>
+      <td>0.07</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>33.18</td>
@@ -215,8 +215,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>34.1229</td>
       <td>-0.14</td>
       <td>FLAT</td>
-      <td>34.2755</td>
-      <td>0.30</td>
+      <td>34.1956</td>
+      <td>0.07</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>33.18</td>
@@ -235,8 +235,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>299.2330</td>
       <td>0.04</td>
       <td>FLAT</td>
-      <td>298.7486</td>
-      <td>-0.12</td>
+      <td>298.8136</td>
+      <td>-0.10</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>295.48, 291.10</td>
@@ -255,8 +255,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>151.0336</td>
       <td>0.14</td>
       <td>FLAT</td>
-      <td>150.7955</td>
-      <td>-0.02</td>
+      <td>150.3792</td>
+      <td>-0.30</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>146.95</td>
@@ -275,8 +275,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>180.8441</td>
       <td>0.03</td>
       <td>FLAT</td>
-      <td>180.6338</td>
-      <td>-0.09</td>
+      <td>180.4940</td>
+      <td>-0.16</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>174.89, 171.56</td>
@@ -295,8 +295,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>273.3895</td>
       <td>-0.04</td>
       <td>FLAT</td>
-      <td>273.3011</td>
-      <td>-0.08</td>
+      <td>272.9609</td>
+      <td>-0.20</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>266.77, 261.68</td>
@@ -340,8 +340,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>94.2936</td>
       <td>-0.00</td>
       <td>FLAT</td>
-      <td>94.4444</td>
-      <td>0.16</td>
+      <td>94.4734</td>
+      <td>0.19</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>93.45, 89.02</td>
@@ -360,8 +360,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>79.9258</td>
       <td>0.09</td>
       <td>FLAT</td>
-      <td>79.6449</td>
-      <td>-0.27</td>
+      <td>79.6128</td>
+      <td>-0.31</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>74.67, 72.37</td>
@@ -380,8 +380,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>78.8861</td>
       <td>-0.00</td>
       <td>FLAT</td>
-      <td>78.9782</td>
-      <td>0.11</td>
+      <td>79.0347</td>
+      <td>0.18</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>77.37, 73.63</td>
@@ -400,8 +400,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>270.3890</td>
       <td>0.00</td>
       <td>FLAT</td>
-      <td>269.5796</td>
-      <td>-0.30</td>
+      <td>269.9120</td>
+      <td>-0.17</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>250.77</td>
@@ -420,8 +420,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>313.8993</td>
       <td>0.02</td>
       <td>FLAT</td>
-      <td>313.2430</td>
-      <td>-0.19</td>
+      <td>313.7018</td>
+      <td>-0.05</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>311.45, 300.25</td>
@@ -465,8 +465,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>313.8993</td>
       <td>0.02</td>
       <td>FLAT</td>
-      <td>313.2430</td>
-      <td>-0.19</td>
+      <td>313.7018</td>
+      <td>-0.05</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>311.45, 300.25</td>
@@ -485,8 +485,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>79.9258</td>
       <td>0.09</td>
       <td>FLAT</td>
-      <td>79.6449</td>
-      <td>-0.27</td>
+      <td>79.6128</td>
+      <td>-0.31</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>74.67, 72.37</td>
@@ -505,8 +505,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>94.2936</td>
       <td>-0.00</td>
       <td>FLAT</td>
-      <td>94.4444</td>
-      <td>0.16</td>
+      <td>94.4734</td>
+      <td>0.19</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>93.45, 89.02</td>
@@ -525,8 +525,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>78.8861</td>
       <td>-0.00</td>
       <td>FLAT</td>
-      <td>78.9782</td>
-      <td>0.11</td>
+      <td>79.0347</td>
+      <td>0.18</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>77.37, 73.63</td>
@@ -545,8 +545,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>270.3890</td>
       <td>0.00</td>
       <td>FLAT</td>
-      <td>269.5796</td>
-      <td>-0.30</td>
+      <td>269.9120</td>
+      <td>-0.17</td>
       <td>FLAT</td>
       <td>flat</td>
       <td>250.77</td>
@@ -660,21 +660,21 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>all</td>
       <td>ridge_price</td>
       <td>60</td>
-      <td>2.356</td>
-      <td>3.246</td>
-      <td>1.244</td>
-      <td>46.667</td>
-      <td>-2.880</td>
+      <td>2.388</td>
+      <td>3.310</td>
+      <td>1.261</td>
+      <td>48.333</td>
+      <td>-4.281</td>
     </tr>
     <tr>
       <td>all</td>
       <td>ridge_sent</td>
       <td>60</td>
-      <td>2.355</td>
-      <td>3.241</td>
-      <td>1.223</td>
-      <td>48.333</td>
-      <td>-1.087</td>
+      <td>2.331</td>
+      <td>3.237</td>
+      <td>1.218</td>
+      <td>50.000</td>
+      <td>-0.682</td>
     </tr>
     <tr>
       <td>social_window</td>
@@ -690,21 +690,21 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>social_window</td>
       <td>ridge_price</td>
       <td>60</td>
-      <td>2.356</td>
-      <td>3.246</td>
-      <td>1.244</td>
-      <td>46.667</td>
-      <td>-2.880</td>
+      <td>2.388</td>
+      <td>3.310</td>
+      <td>1.261</td>
+      <td>48.333</td>
+      <td>-4.281</td>
     </tr>
     <tr>
       <td>social_window</td>
       <td>ridge_sent</td>
       <td>60</td>
-      <td>2.355</td>
-      <td>3.241</td>
-      <td>1.223</td>
-      <td>48.333</td>
-      <td>-1.087</td>
+      <td>2.331</td>
+      <td>3.237</td>
+      <td>1.218</td>
+      <td>50.000</td>
+      <td>-0.682</td>
     </tr>
   </tbody>
 </table><h3>Hyperparameter sensitivity (nested)</h3><p class='note'>Alpha chosen by inner leave-one-session-out inside each training fold. This removes the tuning advantage; a result close to the naive baseline is expected at this sample size.</p><table class="dataframe table">
@@ -735,21 +735,21 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>all</td>
       <td>ridge_price</td>
       <td>60</td>
-      <td>2.356</td>
-      <td>3.246</td>
-      <td>1.244</td>
-      <td>46.667</td>
-      <td>-2.880</td>
+      <td>2.388</td>
+      <td>3.310</td>
+      <td>1.261</td>
+      <td>48.333</td>
+      <td>-4.281</td>
     </tr>
     <tr>
       <td>all</td>
       <td>ridge_sent</td>
       <td>60</td>
-      <td>2.370</td>
-      <td>3.262</td>
-      <td>1.233</td>
+      <td>2.372</td>
+      <td>3.263</td>
+      <td>1.234</td>
       <td>45.000</td>
-      <td>-1.921</td>
+      <td>-2.020</td>
     </tr>
     <tr>
       <td>social_window</td>
@@ -765,21 +765,21 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>social_window</td>
       <td>ridge_price</td>
       <td>60</td>
-      <td>2.356</td>
-      <td>3.246</td>
-      <td>1.244</td>
-      <td>46.667</td>
-      <td>-2.880</td>
+      <td>2.388</td>
+      <td>3.310</td>
+      <td>1.261</td>
+      <td>48.333</td>
+      <td>-4.281</td>
     </tr>
     <tr>
       <td>social_window</td>
       <td>ridge_sent</td>
       <td>60</td>
-      <td>2.370</td>
-      <td>3.262</td>
-      <td>1.233</td>
+      <td>2.372</td>
+      <td>3.263</td>
+      <td>1.234</td>
       <td>45.000</td>
-      <td>-1.921</td>
+      <td>-2.020</td>
     </tr>
   </tbody>
 </table><h3>Session-clustered bootstrap</h3><p class='note'>2.5–97.5% intervals from 1,000 resamples of whole sessions. With only six sessions, the intervals are wide by design; they show how fragile the point estimates are.</p><table class="dataframe table">
@@ -803,33 +803,33 @@ table.table th{background:#f0f4fa} img{max-width:100%}
     <tr>
       <td>ridge_price</td>
       <td>mape_pct</td>
-      <td>1.245</td>
-      <td>1.174</td>
-      <td>1.315</td>
+      <td>1.262</td>
+      <td>1.179</td>
+      <td>1.356</td>
     </tr>
     <tr>
       <td>ridge_price</td>
       <td>direction_acc_pct</td>
-      <td>46.473</td>
-      <td>38.333</td>
-      <td>53.333</td>
+      <td>48.125</td>
+      <td>41.667</td>
+      <td>56.667</td>
     </tr>
     <tr>
       <td>ridge_sent</td>
       <td>mape_pct</td>
-      <td>1.222</td>
-      <td>1.166</td>
-      <td>1.282</td>
+      <td>1.218</td>
+      <td>1.150</td>
+      <td>1.295</td>
     </tr>
     <tr>
       <td>ridge_sent</td>
       <td>direction_acc_pct</td>
-      <td>48.205</td>
-      <td>36.667</td>
-      <td>63.333</td>
+      <td>49.832</td>
+      <td>41.667</td>
+      <td>56.667</td>
     </tr>
   </tbody>
-</table><h3>Feature importances (Random Forest)</h3><p class='note'>How much each feature contributes to the short-history model's splits.</p><table class="dataframe table">
+</table><h3>Feature importances / weights</h3><p class='note'>Random Forest split importance, or normalized absolute Ridge coefficients when the linear model is configured. Larger values mean the feature contributes more to the prediction.</p><table class="dataframe table">
   <thead>
     <tr style="text-align: right;">
       <th>feature</th>
@@ -838,40 +838,40 @@ table.table th{background:#f0f4fa} img{max-width:100%}
   </thead>
   <tbody>
     <tr>
-      <td>rsi_14</td>
-      <td>0.2448</td>
-    </tr>
-    <tr>
-      <td>vol_10</td>
-      <td>0.1918</td>
-    </tr>
-    <tr>
-      <td>social_n_log</td>
-      <td>0.1463</td>
-    </tr>
-    <tr>
       <td>news_sent_wmean</td>
-      <td>0.1253</td>
+      <td>0.3100</td>
     </tr>
     <tr>
       <td>ret_5</td>
-      <td>0.1137</td>
+      <td>0.2912</td>
     </tr>
     <tr>
-      <td>social_neg_share</td>
-      <td>0.0605</td>
+      <td>social_n_log</td>
+      <td>0.1201</td>
+    </tr>
+    <tr>
+      <td>vol_10</td>
+      <td>0.0944</td>
     </tr>
     <tr>
       <td>ret_1</td>
-      <td>0.0590</td>
+      <td>0.0637</td>
+    </tr>
+    <tr>
+      <td>social_neg_share</td>
+      <td>0.0497</td>
+    </tr>
+    <tr>
+      <td>rsi_14</td>
+      <td>0.0329</td>
     </tr>
     <tr>
       <td>social_pos_share</td>
-      <td>0.0300</td>
+      <td>0.0208</td>
     </tr>
     <tr>
       <td>social_sent_wmean</td>
-      <td>0.0286</td>
+      <td>0.0173</td>
     </tr>
     <tr>
       <td>has_social</td>
@@ -888,39 +888,39 @@ table.table th{background:#f0f4fa} img{max-width:100%}
   <tbody>
     <tr>
       <td>news_sent_wmean</td>
-      <td>0.0015</td>
+      <td>0.0026</td>
     </tr>
     <tr>
       <td>ret_5</td>
-      <td>-0.0014</td>
+      <td>-0.0024</td>
     </tr>
     <tr>
       <td>social_n_log</td>
-      <td>0.0007</td>
+      <td>0.0010</td>
     </tr>
     <tr>
       <td>vol_10</td>
+      <td>0.0008</td>
+    </tr>
+    <tr>
+      <td>ret_1</td>
       <td>0.0005</td>
+    </tr>
+    <tr>
+      <td>social_neg_share</td>
+      <td>0.0004</td>
+    </tr>
+    <tr>
+      <td>rsi_14</td>
+      <td>0.0003</td>
     </tr>
     <tr>
       <td>social_pos_share</td>
       <td>0.0002</td>
     </tr>
     <tr>
-      <td>rsi_14</td>
-      <td>-0.0002</td>
-    </tr>
-    <tr>
       <td>social_sent_wmean</td>
       <td>0.0001</td>
-    </tr>
-    <tr>
-      <td>ret_1</td>
-      <td>0.0001</td>
-    </tr>
-    <tr>
-      <td>social_neg_share</td>
-      <td>0.0000</td>
     </tr>
     <tr>
       <td>has_social</td>
@@ -1333,8 +1333,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>270.3890</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>-0.0030</td>
-      <td>269.5796</td>
+      <td>-0.0017</td>
+      <td>269.9120</td>
     </tr>
     <tr>
       <td>0005.HK</td>
@@ -1345,8 +1345,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>34.1229</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>0.0030</td>
-      <td>34.2755</td>
+      <td>0.0007</td>
+      <td>34.1956</td>
     </tr>
     <tr>
       <td>035720.KS</td>
@@ -1357,8 +1357,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>313.8993</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>-0.0019</td>
-      <td>313.2430</td>
+      <td>-0.0005</td>
+      <td>313.7018</td>
     </tr>
     <tr>
       <td>1810.HK</td>
@@ -1369,8 +1369,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>180.8441</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>-0.0009</td>
-      <td>180.6338</td>
+      <td>-0.0016</td>
+      <td>180.4940</td>
     </tr>
     <tr>
       <td>035420.KS</td>
@@ -1381,8 +1381,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>94.2936</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>0.0016</td>
-      <td>94.4444</td>
+      <td>0.0019</td>
+      <td>94.4734</td>
     </tr>
     <tr>
       <td>005930.KS</td>
@@ -1393,8 +1393,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>79.9258</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>-0.0027</td>
-      <td>79.6449</td>
+      <td>-0.0031</td>
+      <td>79.6128</td>
     </tr>
     <tr>
       <td>3690.HK</td>
@@ -1405,8 +1405,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>273.3895</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>-0.0008</td>
-      <td>273.3011</td>
+      <td>-0.0020</td>
+      <td>272.9609</td>
     </tr>
     <tr>
       <td>005380.KS</td>
@@ -1417,8 +1417,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>78.8861</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>0.0011</td>
-      <td>78.9782</td>
+      <td>0.0018</td>
+      <td>79.0347</td>
     </tr>
     <tr>
       <td>9988.HK</td>
@@ -1429,8 +1429,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>299.2330</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>-0.0012</td>
-      <td>298.7486</td>
+      <td>-0.0010</td>
+      <td>298.8136</td>
     </tr>
     <tr>
       <td>0700.HK</td>
@@ -1441,8 +1441,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>151.0336</td>
       <td>FLAT</td>
       <td>ridge_price</td>
-      <td>-0.0002</td>
-      <td>150.7955</td>
+      <td>-0.0030</td>
+      <td>150.3792</td>
     </tr>
   </tbody>
 </table>
