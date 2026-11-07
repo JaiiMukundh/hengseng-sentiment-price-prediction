@@ -36,6 +36,18 @@ Assets, keywords and exchange calendars live in `config.yaml`.
 
 Each run is capped with `maxTotalChargeUsd` (`max_charge_usd` in `config.yaml`). The cap is passed as a query parameter, not in the Actor input.
 
+**Estimated cost of one full run** (published "from" prices, before plan discounts):
+
+| Source | Price | Volume in one run | Estimated cost |
+|---|---|---|---|
+| LIHKG | $2.00 / 1,000 items | 10 keywords x up to 100 items | <= $2.00 |
+| Telegram search | $2.80 / 1,000 messages | up to 200 messages | <= $0.56 |
+| Naver (Playwright) | pay per usage | 25 page loads | ~$0.05-0.20 |
+| Blind | $18.00 / 1,000 posts | up to 100 posts | <= $1.80 |
+| Exa news | per Exa credits | 50 searches | free credits / plan |
+
+About **$4.50-5.00 per full run** at these caps, with a hard worst-case cap of $12 reserved across the four Actors. Reduce `max_items` or disable a source to spend less.
+
 ### News source
 
 Exa (`POST https://api.exa.ai/search`, `category: news`, `startPublishedDate` set to the look-back window, highlights returned). Tavily is not used, so no Tavily key is needed.
