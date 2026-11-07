@@ -1,0 +1,91 @@
+# HengSeng Sentiment Price Prediction - pipeline configuration.
+# Secrets (APIFY_API_TOKEN, EXA_API_KEY) are read from the environment / .env, never from this file.
+
+window:
+  social_days: 10            # social + news look-back window
+  price_period: 1y           # price history used for technicals and walk-forward training
+
+exchanges:
+  HKEX:
+    tz: Asia/Hong_Kong
+    close: "16:00"
+    assets:
+      - ticker: 0700.HK
+        name: Tencent Holdings
+        keywords: ["Tencent", "腾讯", "騰訊", "$0700", "00700"]
+      - ticker: 9988.HK
+        name: Alibaba Group
+        keywords: ["Alibaba", "阿里巴巴", "阿里", "$9988", "09988"]
+      - ticker: 3690.HK
+        name: Meituan
+        keywords: ["Meituan", "美团", "美團", "$3690", "03690"]
+      - ticker: 0005.HK
+        name: HSBC Holdings
+        keywords: ["HSBC", "汇丰", "匯豐", "$0005", "00005"]
+      - ticker: 1810.HK
+        name: Xiaomi
+        keywords: ["Xiaomi", "小米", "$1810", "01810"]
+  KRX:
+    tz: Asia/Seoul
+    close: "15:30"
+    assets:
+      - ticker: 005930.KS
+        name: Samsung Electronics
+        keywords: ["Samsung Electronics", "삼성전자"]
+      - ticker: 000660.KS
+        name: SK hynix
+        keywords: ["SK hynix", "SK하이닉스", "하이닉스"]
+      - ticker: 035420.KS
+        name: NAVER
+        keywords: ["NAVER", "네이버"]
+      - ticker: 035720.KS
+        name: Kakao
+        keywords: ["Kakao", "카카오"]
+      - ticker: 005380.KS
+        name: Hyundai Motor
+        keywords: ["Hyundai Motor", "현대차", "현대자동차"]
+
+sources:
+  # Social source 1 for HKEX (LIHKG forum keyword search)
+  lihkg:
+    enabled: true
+    exchanges: [HKEX]
+    actor: claude_code_reviewer~lihkg-scraper
+    max_items: 100
+    date_from: 2w
+    max_charge_usd: 3
+  # Social source 2 for HKEX (Telegram public channels; fill the channel list)
+  telegram:
+    enabled: true
+    exchanges: [HKEX]
+    actor: tri_angle~telegram-scraper
+    channels:
+      HKEX: []               # e.g. ["@some_hk_stock_channel"] - required, no default channels are guessed
+    max_charge_usd: 3
+  # Social source 1 for KRX (Naver Finance stock discussion board, JS-rendered)
+  naver_discussion:
+    enabled: true
+    exchanges: [KRX]
+    actor: apify~playwright-scraper
+    board_url: "https://finance.naver.com/item/board.naver?code={code}&page={page}"
+    pages: 5
+    max_charge_usd: 3
+  # Social source 2 for KRX (Blind keyword search; Korean feed)
+  blind:
+    enabled: true
+    exchanges: [KRX]
+    actor: hypebridge~blind-post-scraper
+    search_url: "https://www.teamblind.com/kr/search/{query}"
+    max_items: 200
+    max_charge_usd: 3
+
+news:
+  provider: exa
+  num_results: 10
+
+model:
+  min_train_dates: 60        # walk-forward warm-up, in trading sessions
+  test_block: 5              # sessions per out-of-sample block
+  ridge_alpha: 1.0
+  signal_threshold: 0.005    # |predicted return| above this -> LONG / SHORT, otherwise FLAT
+  sentiment_direction: 0.1   # |sentiment score| above this -> BULLISH / BEARISH

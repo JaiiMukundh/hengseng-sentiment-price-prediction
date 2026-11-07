@@ -1,0 +1,267 @@
+"""Command line entry point.
+
+Stages: scrape (Apify) -> news (Exa) -> prices (yfinance) -> model (align, features, walk-forward) -> report.
+Run everything with `python -m sentpred run`, or try the whole pipeline offline with `python -m sentpred demo`.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from . import align, features, levels, model
+from .config import ROOT, Config, apify_token, exa_key, load_config
+from .sources import POST_COLUMNS
+
+log = logging.getLogger("sentpred")
+
+
+class Paths:
+    def __init__(self, base: Path, report_dir: Path):
+        self.raw = base / "raw"
+        self.processed = base / "processed"
+        self.report = report_dir
+        for p in (self.raw, self.processed, self.report):
+            p.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def posts(self) -> Path:
+        return self.processed / "social_posts.csv"
+
+    @property
+    def news(self) -> Path:
+        return self.processed / "news.csv"
+
+    @property
+    def prices(self) -> Path:
+        return self.processed / "prices.csv"
+
+
+def _read(path: Path, parse_dates: list[str], columns: list[str] | None = None) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame(columns=columns or [])
+    return pd.read_csv(path, parse_dates=parse_dates)
+
+
+def stage_scrape(cfg: Config, paths: Paths) -> None:
+    from .apify import ApifyError, run_actor
+    from .sources import build_run_input, normalize
+
+    token = apify_token()
+    if not token:
+        raise SystemExit("APIFY_API_TOKEN is not set (see .env.example)")
+    window = cfg.raw["window"]["social_days"]
+    frames = []
+    for name, src in cfg.raw["sources"].items():
+        if not src.get("enabled"):
+            continue
+        for exchange in src["exchanges"]:
+            assets = cfg.assets_for(exchange)
+            run_input = build_run_input(name, src, exchange, assets, window)
+            if run_input is None:
+                continue
+            try:
+                items = run_actor(src["actor"], run_input, token, max_charge_usd=src.get("max_charge_usd"))
+            except ApifyError as exc:
+                log.error("%s/%s failed: %s", name, exchange, exc)
+                continue
+            (paths.raw / f"{name}_{exchange}.json").write_text(
+                json.dumps(items, ensure_ascii=False, default=str), encoding="utf-8")
+            df = normalize(name, exchange, items, assets)
+            log.info("%s/%s: %d raw items -> %d asset-matched posts", name, exchange, len(items), len(df))
+            frames.append(df)
+    new = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=POST_COLUMNS)
+    _append(paths.posts, new)
+
+
+def stage_news(cfg: Config, paths: Paths) -> None:
+    from .news import fetch_news
+
+    key = exa_key()
+    if not key:
+        raise SystemExit("EXA_API_KEY is not set (see .env.example)")
+    df = fetch_news(cfg.assets, key, cfg.raw["window"]["social_days"], cfg.raw["news"]["num_results"])
+    _append(paths.news, df)
+    log.info("news: %d new items", len(df))
+
+
+def _append(path: Path, new: pd.DataFrame) -> None:
+    """Accumulate history across runs so sentiment coverage grows day by day; de-duplicate repeats."""
+    old = _read(path, [], POST_COLUMNS)
+    merged = pd.concat([old, new], ignore_index=True)
+    merged = merged.drop_duplicates(subset=["source", "ticker", "text", "published_utc"], keep="last")
+    merged.to_csv(path, index=False)
+
+
+def stage_prices(cfg: Config, paths: Paths) -> None:
+    from .prices import fetch_prices
+
+    df = fetch_prices(cfg.assets, cfg.raw["window"]["price_period"])
+    df.to_csv(paths.prices, index=False)
+    log.info("prices: %d bars for %d tickers", len(df), df["ticker"].nunique())
+
+
+def stage_model(cfg: Config, paths: Paths) -> dict:
+    prices = _read(paths.prices, ["date"])
+    posts = _read(paths.posts, ["published_utc"], POST_COLUMNS)
+    news = _read(paths.news, ["published_utc"], POST_COLUMNS)
+    if prices.empty:
+        raise SystemExit("no price data; run the prices stage first")
+
+    calendars = {}
+    for exchange in cfg.exchanges:
+        ex = cfg.exchange(exchange)
+        ex_prices = prices[prices["exchange"] == exchange]
+        if ex_prices.empty:
+            continue
+        calendars[exchange] = (ex["tz"], ex["close"], align.session_calendar(ex_prices["date"]))
+
+    social_agg = align.aggregate(_utc(posts), calendars, "social_")
+    news_agg = align.aggregate(_utc(news), calendars, "news_")
+    dataset = features.build_dataset(prices, social_agg, news_agg)
+
+    mcfg = cfg.raw["model"]
+    preds = model.walk_forward(dataset, mcfg["min_train_dates"], mcfg["test_block"], mcfg["ridge_alpha"])
+    metrics = model.evaluate(preds)
+    forecasts = model.live_forecast(dataset, metrics, mcfg["ridge_alpha"], mcfg["signal_threshold"])
+
+    lvl = {}
+    for asset in cfg.assets:
+        px = prices[prices["ticker"] == asset.ticker].sort_values("date")
+        if px.empty:
+            continue
+        lvl[asset.ticker] = {**levels.swing_levels(px), "pivots": levels.pivot_points(px.iloc[-1])}
+
+    sent_sessions = int(dataset.loc[dataset["has_social"] + dataset["has_news"] > 0, "date"].nunique())
+    if sent_sessions < mcfg["min_train_dates"]:
+        log.warning("only %d sessions with social/news history (need %d before the sentiment model is trained); "
+                    "keep the daily scrape running to accumulate history", sent_sessions, mcfg["min_train_dates"])
+
+    dataset.to_csv(paths.processed / "dataset.csv", index=False)
+    preds.to_csv(paths.processed / "walk_forward_predictions.csv", index=False)
+    metrics.to_csv(paths.processed / "model_metrics.csv", index=False)
+    forecasts.to_csv(paths.processed / "forecasts.csv", index=False)
+    log.info("model: %d out-of-sample rows; best model for forecast: %s",
+             len(preds), forecasts["model_used"].iloc[0] if len(forecasts) else "n/a")
+    return {"prices": prices, "posts": posts, "news": news, "forecasts": forecasts,
+            "levels": lvl, "metrics": metrics, "sent_sessions": sent_sessions}
+
+
+def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> Path:
+    from .report import write_report
+
+    needed = cfg.raw["model"]["min_train_dates"]
+    coverage = f"Sentiment history covers {state['sent_sessions']} session(s); the sentiment model needs {needed}."
+    if state["sent_sessions"] < needed:
+        coverage += " Until then, the sentiment model's weights are untrained and its results are not meaningful."
+    banner = " ".join(filter(None, [banner, coverage]))
+    path = write_report(paths.report, cfg, state["prices"], state["posts"], state["news"],
+                        state["forecasts"], state["levels"], state["metrics"], banner)
+    log.info("report written to %s", path)
+    return path
+
+
+def _utc(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    out["published_utc"] = pd.to_datetime(out["published_utc"], utc=True)
+    return out
+
+
+def run_demo(cfg: Config, paths: Paths) -> Path:
+    """Synthetic data: exercises every stage offline. Numbers are NOT real market data."""
+    rng = np.random.default_rng(7)
+    today = pd.Timestamp.utcnow().tz_localize(None).normalize()
+    price_rows = []
+    for asset in cfg.assets:
+        dates = pd.bdate_range(end=today, periods=260)
+        start = rng.uniform(20, 400)
+        rets = rng.normal(0.0004, 0.015, len(dates))
+        close = start * np.exp(np.cumsum(rets))
+        high = close * (1 + np.abs(rng.normal(0, 0.008, len(dates))))
+        low = close * (1 - np.abs(rng.normal(0, 0.008, len(dates))))
+        open_ = np.r_[start, close[:-1]]
+        vol = rng.integers(1e6, 5e6, len(dates))
+        price_rows.append(pd.DataFrame({
+            "ticker": asset.ticker, "exchange": asset.exchange, "date": dates,
+            "open": open_, "high": high, "low": low, "close": close, "volume": vol,
+        }))
+    prices = pd.concat(price_rows, ignore_index=True)
+
+    posting = [
+        "{name} breakout looks strong, buy the dip", "{name} earnings miss, bearish outlook",
+        "{name} 看好 后市 上涨", "{name} 下跌 割肉 利淡", "{name} 주가 상승 매수 추천",
+        "{name} 하락 악재 매도", "just watching {name} today", "{name} rally continues, record high",
+    ]
+    post_rows = []
+    now = pd.Timestamp.utcnow().tz_localize(None)
+    for asset in cfg.assets:
+        for _ in range(int(rng.integers(40, 120))):
+            ts = now - pd.Timedelta(minutes=int(rng.integers(0, 10 * 24 * 60)))
+            post_rows.append({
+                "source": "demo_social", "exchange": asset.exchange, "ticker": asset.ticker,
+                "text": rng.choice(posting).format(name=asset.name), "published_utc": ts.tz_localize("UTC"),
+                "url": None, "author": "demo", "likes": float(rng.integers(0, 300)),
+                "reposts": float(rng.integers(0, 50)), "views": float(rng.integers(0, 5000)),
+                "followers": float(rng.integers(0, 50000)),
+            })
+    posts = pd.DataFrame(post_rows, columns=POST_COLUMNS)
+    news = posts[posts["ticker"].isin([a.ticker for a in cfg.assets])].sample(frac=0.2, random_state=1).copy()
+    news["source"] = "demo_news"
+    news["likes"] = 0.0
+    news["reposts"] = 0.0
+    news["views"] = 0.0
+    news["followers"] = 0.0
+
+    prices.to_csv(paths.prices, index=False)
+    posts.to_csv(paths.posts, index=False)
+    news.to_csv(paths.news, index=False)
+    log.info("demo data generated: %d bars, %d posts, %d news", len(prices), len(posts), len(news))
+    state = stage_model(cfg, paths)
+    return stage_report(cfg, paths, state, "DEMO: synthetic data for pipeline testing. Not real market or social data.")
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(prog="sentpred", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--config", default=str(ROOT / "config.yaml"))
+    parser.add_argument("--demo", action="store_true", help="write outputs under data/demo and reports/demo")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    for name in ("scrape", "news", "prices", "model", "report", "run", "demo"):
+        sub.add_parser(name)
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    cfg = load_config(args.config)
+    if args.demo or args.cmd == "demo":
+        paths = Paths(ROOT / "data" / "demo", ROOT / "reports" / "demo")
+    else:
+        paths = Paths(ROOT / "data", ROOT / "reports")
+
+    if args.cmd == "demo":
+        print(run_demo(cfg, paths))
+        return
+    if args.cmd == "scrape":
+        stage_scrape(cfg, paths)
+    elif args.cmd == "news":
+        stage_news(cfg, paths)
+    elif args.cmd == "prices":
+        stage_prices(cfg, paths)
+    elif args.cmd == "model":
+        stage_model(cfg, paths)
+    elif args.cmd == "report":
+        state = stage_model(cfg, paths)
+        print(stage_report(cfg, paths, state, None))
+    elif args.cmd == "run":
+        for stage in (stage_scrape, stage_news, stage_prices):
+            try:
+                stage(cfg, paths)
+            except SystemExit as exc:
+                log.error("%s skipped: %s", stage.__name__, exc)
+        state = stage_model(cfg, paths)
+        print(stage_report(cfg, paths, state, None))
