@@ -12,30 +12,46 @@ import re
 from .config import Asset
 
 POSITIVE = [
-    "beat", "bullish", "buy", "upgrade", "surge", "rally", "record", "growth", "strong", "profit",
-    "breakout", "outperform", "undervalued", "dividend", "gain", "rise", "soar", "win", "moon",
+    "beat", "bullish", "buy", "good", "upgrade", "surge", "rally", "record", "growth", "strong",
+    "profit", "breakout", "outperform", "undervalued", "dividend", "gain", "rise", "soar", "win", "moon",
     "看好", "上涨", "大涨", "抄底", "加仓", "买入", "利好", "突破", "强势", "強勁", "反彈", "賺", "新高", "牛",
+    "上升", "上漲", "買入", "強勢", "回升", "做好", "向好", "樂觀", "乐观", "賺錢", "赚钱", "好消息",
     "상승", "급등", "매수", "호재", "상한가", "신고가", "실적개선", "강세", "반등", "추천", "수익",
 ]
 NEGATIVE = [
-    "miss", "bearish", "sell", "downgrade", "plunge", "crash", "drop", "loss", "weak", "dump",
+    "miss", "bearish", "sell", "downgrade", "plunge", "crash", "drop", "loss", "weak", "bad", "dump",
     "lawsuit", "fraud", "fine", "slump", "fall", "decline", "cut", "tank", "overvalued",
     "看淡", "下跌", "大跌", "暴跌", "割肉", "沽", "利淡", "套牢", "止蝕", "減持", "亏", "虧", "熊",
     "하락", "급락", "매도", "악재", "하한가", "신저가", "약세", "손실", "적자", "폭락", "공매도", "물려",
 ]
 
-NEGATIONS = [
+# English negations must be whole words ("not" must not match "nothing" or "now").
+_EN_NEGATIONS = (
     "not", "no", "never", "without", "isn't", "aren't", "wasn't", "won't", "can't", "don't", "doesn't",
-    "不", "沒", "没", "別", "别", "無", "无", "未", "唔", "唔好", "唔係",
-    "안", "못", "없", "아니", "말고", "아닌",
-]
+)
+# Korean negations only when standalone; "안" must not match inside "안정적" (stable).
+_KO_STANDALONE_NEGATIONS = ("안", "못")
+# CJK negations are safe as substrings (no word delimiters in written Chinese/Korean).
+_ZH_NEGATIONS = ("不", "沒", "没", "別", "别", "無", "无", "未", "唔", "唔好", "唔係")
+_KO_SUBSTRING_NEGATIONS = ("없", "아니", "말고", "아닌")
+_CJK_NEGATIONS = (*_ZH_NEGATIONS, *_KO_SUBSTRING_NEGATIONS)
+NEGATIONS = [*_EN_NEGATIONS, *_ZH_NEGATIONS, *_KO_STANDALONE_NEGATIONS, *_KO_SUBSTRING_NEGATIONS]
 
 _ASCII_TERM = re.compile(r"^[a-z ]+$")
+_EN_NEGATION_RE = re.compile(
+    r"(?<![a-z0-9_])(?:" + "|".join(re.escape(n) for n in _EN_NEGATIONS) + r")(?![a-z0-9_])"
+)
+_KO_STANDALONE_NEGATION_RE = re.compile(
+    r"(?<![가-힣])(?:" + "|".join(re.escape(n) for n in _KO_STANDALONE_NEGATIONS) + r")(?![가-힣])"
+)
+_CLAUSE_PUNCTUATION = re.compile(r"[,.!?;:，。！？；：、…\n]")
 
 
 def _is_negated(text: str, start: int, window: int = 14) -> bool:
-    context = text[max(0, start - window):start]
-    return any(neg in context for neg in NEGATIONS)
+    context = _CLAUSE_PUNCTUATION.split(text[max(0, start - window):start])[-1]
+    if _EN_NEGATION_RE.search(context) or _KO_STANDALONE_NEGATION_RE.search(context):
+        return True
+    return any(neg in context for neg in _CJK_NEGATIONS)
 
 
 def _score(text: str) -> tuple[int, int]:

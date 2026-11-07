@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import align, features, levels, model
+from . import align, evaluation, features, levels, model
 from .config import ROOT, Config, apify_token, exa_key, load_config
 from .sources import POST_COLUMNS
 
@@ -67,7 +67,7 @@ def stage_scrape(cfg: Config, paths: Paths, reuse_raw: bool = False) -> None:
     token = apify_token()
     if not token:
         raise SystemExit("APIFY_API_TOKEN is not set (see .env.example)")
-    window = cfg.raw["window"]["social_days"]
+    window = cfg.raw["window"].get("history_days", cfg.raw["window"]["social_days"])
     frames = []
     for name, src in cfg.raw["sources"].items():
         if not src.get("enabled"):
@@ -79,13 +79,20 @@ def stage_scrape(cfg: Config, paths: Paths, reuse_raw: bool = False) -> None:
                 items = json.loads(raw_path.read_text(encoding="utf-8"))
                 log.info("%s/%s: reusing %d cached items from %s", name, exchange, len(items), raw_path.name)
             else:
-                run_input = build_run_input(name, src, exchange, assets, window)
-                if run_input is None:
-                    continue
-                try:
-                    items = run_actor(src["actor"], run_input, token, max_charge_usd=src.get("max_charge_usd"))
-                except ApifyError as exc:
-                    log.error("%s/%s failed: %s", name, exchange, exc)
+                limit = src.get("max_assets_per_run")
+                batches = [assets] if not limit else [assets[i:i + limit] for i in range(0, len(assets), limit)]
+                items = []
+                for batch in batches:
+                    run_input = build_run_input(name, src, exchange, batch, window)
+                    if run_input is None:
+                        continue
+                    try:
+                        items.extend(run_actor(src["actor"], run_input, token,
+                                               max_charge_usd=src.get("max_charge_usd"),
+                                               timeout_s=src.get("timeout_s", 900)))
+                    except ApifyError as exc:
+                        log.error("%s/%s batch failed: %s", name, exchange, exc)
+                if not items:
                     continue
                 raw_path.write_text(json.dumps(items, ensure_ascii=False, default=str), encoding="utf-8")
             df = normalize(name, exchange, items, assets)
@@ -106,7 +113,9 @@ def stage_news(cfg: Config, paths: Paths) -> None:
     key = exa_key()
     if not key:
         raise SystemExit("EXA_API_KEY is not set (see .env.example)")
-    df = fetch_news(cfg.assets, key, cfg.raw["window"]["social_days"], cfg.raw["news"]["num_results"])
+    df = fetch_news(cfg.assets, key,
+                    cfg.raw["window"].get("history_days", cfg.raw["window"]["social_days"]),
+                    cfg.raw["news"]["num_results"])
     _append(paths.news, df)
     log.info("news: %d new items", len(df))
 
@@ -155,12 +164,14 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     preds = model.walk_forward(dataset, mcfg["min_train_dates"], mcfg["test_block"], mcfg["ridge_alpha"])
     metrics = model.evaluate(preds)
     forecasts = model.live_forecast(dataset, metrics, mcfg["ridge_alpha"], mcfg["signal_threshold"])
-    sent_sessions = int(dataset.loc[dataset["has_social"] + dataset["has_news"] > 0, "date"].nunique())
+    sent_sessions = int(dataset.loc[(dataset["has_social"] + dataset["has_news"] > 0)
+                                    & dataset["y_next_ret"].notna(), "date"].nunique())
 
     short_metrics = None
     nested_metrics = None
     coefficients = None
     importances = None
+    bootstrap = None
     if sent_sessions < mcfg["min_train_dates"]:
         sent_alpha = mcfg.get("sentiment_alpha", 50)
         sent_shrink = mcfg.get("sentiment_shrinkage", 0.5)
@@ -168,15 +179,17 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
         short_preds, short_dates = model.leave_one_session_out(
             dataset, sent_alpha, sent_shrink, sent_model)
         short_metrics = model.evaluate(short_preds)
+        bootstrap = evaluation.cluster_bootstrap(short_preds)
         nested = model.nested_sentiment_predictions(dataset, shrink=sent_shrink)
         nested = nested.merge(short_preds[["date", "ticker", "pred_ridge_price"]], on=["date", "ticker"], how="left")
         nested["pred_naive"] = 0.0
         nested_metrics = model.evaluate(nested.dropna(subset=["pred_ridge_price", "pred_ridge_sent"]))
         coefficients = model.sentiment_coefficients(dataset, sent_alpha)
-        importances = model.sentiment_importances(dataset, sent_model)
+        importances = model.sentiment_importances(dataset, sent_model, sent_alpha)
         forecasts = forecasts.merge(
             model.sentiment_forecast(dataset, sent_alpha, sent_shrink, sent_model), on="ticker", how="left")
         short_metrics.to_csv(paths.processed / "short_history_metrics.csv", index=False)
+        bootstrap.to_csv(paths.processed / "short_history_bootstrap.csv", index=False)
         nested_metrics.to_csv(paths.processed / "sentiment_nested_metrics.csv", index=False)
         coefficients.to_csv(paths.processed / "sentiment_coefficients.csv", index=False)
         importances.to_csv(paths.processed / "sentiment_importances.csv", index=False)
@@ -204,21 +217,24 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     return {"prices": prices, "posts": posts, "news": news, "forecasts": forecasts,
             "levels": lvl, "metrics": metrics, "preds": preds, "sent_sessions": sent_sessions,
             "short_metrics": short_metrics, "nested_metrics": nested_metrics,
-            "coefficients": coefficients, "importances": importances}
+            "coefficients": coefficients, "importances": importances, "bootstrap": bootstrap}
 
 
 def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> Path:
     from .report import write_report
 
     needed = cfg.raw["model"]["min_train_dates"]
-    coverage = (f"Sentiment history covers {state['sent_sessions']} session(s). "
+    report_days = cfg.raw["window"].get("social_days", 10)
+    history_days = cfg.raw["window"].get("history_days", report_days)
+    coverage = (f"Current-sentiment tables use the last {report_days} days; model training uses up to "
+                f"{history_days} days ({state['sent_sessions']} sessions). "
                 f"Below {needed} sessions the pipeline reports a pooled leave-one-session-out "
                 f"model as short-history evidence, not a full walk-forward.")
     banner = " ".join(filter(None, [banner, coverage]))
     path = write_report(paths.report, cfg, state["prices"], state["posts"], state["news"],
                         state["forecasts"], state["levels"], state["metrics"], state["preds"],
                         state["short_metrics"], state["coefficients"], banner, state["nested_metrics"],
-                        state["importances"])
+                        state["importances"], state["bootstrap"])
     log.info("report written to %s", path)
     return path
 

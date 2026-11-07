@@ -20,6 +20,20 @@ def _prices(n_days=200, tickers=("0700.HK", "9988.HK"), seed=0):
     return pd.concat(rows, ignore_index=True)
 
 
+def _sentiment_dataset(n_days=30, seed=7):
+    dataset = build_dataset(_prices(n_days=n_days), pd.DataFrame(columns=["ticker", "date"]),
+                            pd.DataFrame(columns=["ticker", "date"]))
+    rng = np.random.default_rng(seed)
+    dataset["has_social"] = 1.0
+    dataset["social_n"] = 1.0
+    dataset["social_n_log"] = 1.0
+    dataset["social_sent_mean"] = rng.normal(0, 0.4, len(dataset))
+    dataset["social_sent_wmean"] = dataset["social_sent_mean"]
+    dataset["social_pos_share"] = 0.5
+    dataset["social_neg_share"] = 0.5
+    return dataset
+
+
 def test_session_mapping_respects_close_and_weekends():
     sessions = pd.DatetimeIndex(["2026-11-05", "2026-11-06", "2026-11-09"])
     ts = pd.Series(pd.to_datetime([
@@ -112,6 +126,38 @@ def test_short_history_sentiment_model_trains_real_weights():
     forecast = model.sentiment_forecast(dataset, alpha=50.0, shrink=0.5)
     assert sorted(forecast["ticker"]) == ["0700.HK", "9988.HK"]
     assert forecast["pred_sent_price"].notna().all()
+
+    importances = model.sentiment_importances(dataset, "rf")
+    assert len(importances) == len(model.SENTIMENT_MODEL_FEATURES)
+    assert importances["importance"].sum() == pytest.approx(1.0)
+    assert (importances["importance"] >= 0).all()
+
+
+@pytest.mark.parametrize("model_name", ["rf", "ridge"])
+def test_sentiment_importances_finite_and_normalized_for_both_models(model_name):
+    dataset = _sentiment_dataset()
+
+    importances = model.sentiment_importances(dataset, model_name)
+    values = importances["importance"].to_numpy(dtype=float)
+
+    assert list(importances.columns) == ["feature", "importance"]
+    assert set(importances["feature"]) == set(model.SENTIMENT_MODEL_FEATURES)
+    assert len(importances) == len(model.SENTIMENT_MODEL_FEATURES)
+    assert np.isfinite(values).all()
+    assert (values >= 0).all()
+    assert values.sum() == pytest.approx(1.0)
+
+
+def test_ridge_importances_are_normalized_absolute_standardized_coefficients():
+    dataset = _sentiment_dataset()
+
+    importances = model.sentiment_importances(dataset, "ridge", alpha=100.0)
+    coefficients = model.sentiment_coefficients(dataset, alpha=100.0)
+    expected = coefficients.set_index("feature")["coefficient"].abs()
+    expected = expected / expected.sum()
+    actual = importances.set_index("feature")["importance"]
+
+    assert np.allclose(actual.sort_index(), expected.sort_index())
 
 
 def test_walk_forward_requires_enough_history():

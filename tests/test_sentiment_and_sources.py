@@ -21,6 +21,31 @@ def test_score_text_bilingual(text, expected):
     assert score == pytest.approx(expected)
 
 
+@pytest.mark.parametrize("text,expected", [
+    ("Tencent now buy the dip", 1.0),
+    ("November rally continues", 1.0),
+    ("주가 안정적 상승", 1.0),
+    ("not good", -1.0),
+    ("not bad", 1.0),
+    ("上升股份 … 下跌股份", 0.0),
+])
+def test_score_text_negation_regressions(text, expected):
+    score, _ = score_text(text)
+    assert score == pytest.approx(expected)
+
+
+def test_negation_window_stops_at_clause_punctuation():
+    # "not" belongs to the previous clause and must not flip "buy".
+    assert score_text("Not today. Buy the dip.")[0] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("term", [
+    "上升", "上漲", "買入", "強勢", "回升", "做好", "向好", "樂觀", "賺錢", "好消息",
+])
+def test_chinese_positive_terms(term):
+    assert score_text(f"騰訊 {term}")[0] == pytest.approx(1.0)
+
+
 def test_score_text_hit_count():
     assert score_text("nothing here") == (0.0, 0)
     assert score_text("buy and sell")[1] == 2

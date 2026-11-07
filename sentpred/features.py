@@ -95,6 +95,43 @@ def price_features(prices: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def _append_pending_sessions(df: pd.DataFrame, social: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
+    """Carry the last price features into the next session so after-close/weekend posts reach inference."""
+    if social.empty and news.empty:
+        return df
+    rows = []
+    for ticker, group in df.sort_values("date").groupby("ticker", sort=False):
+        last = group.iloc[-1]
+        future_dates = []
+        for feed in (social, news):
+            if not feed.empty:
+                future = feed[(feed["ticker"] == ticker) & (feed["date"] > last["date"])]
+                if not future.empty:
+                    future_dates.append(future["date"].max())
+        if not future_dates:
+            continue
+        session = max(future_dates)
+        row = last.copy()
+        row["date"] = session
+        row["y_next_ret"] = np.nan
+        row["next_close"] = np.nan
+        for prefix, feed in (("social", social), ("news", news)):
+            if feed.empty:
+                continue
+            sub = feed[(feed["ticker"] == ticker) & (feed["date"] == session)]
+            for col in feed.columns:
+                if col in {"ticker", "date"}:
+                    continue
+                row[col] = sub[col].iloc[0] if not sub.empty else 0.0
+            row[f"{prefix}_n"] = float(sub[f"{prefix}_n"].iloc[0]) if not sub.empty else 0.0
+            row[f"has_{prefix}"] = 1.0 if row[f"{prefix}_n"] > 0 else 0.0
+            row[f"{prefix}_n_log"] = np.log1p(row[f"{prefix}_n"])
+        rows.append(row)
+    if rows:
+        df = pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+    return df
+
+
 def build_dataset(prices: pd.DataFrame, social: pd.DataFrame, news: pd.DataFrame,
                   market: pd.DataFrame | None = None) -> pd.DataFrame:
     df = price_features(prices)
@@ -110,4 +147,4 @@ def build_dataset(prices: pd.DataFrame, social: pd.DataFrame, news: pd.DataFrame
             df[col] = df[col].fillna(0.0)
         df[f"has_{prefix}"] = (df[f"{prefix}_n"] > 0).astype(float)
         df[f"{prefix}_n_log"] = np.log1p(df[f"{prefix}_n"])
-    return df
+    return _append_pending_sessions(df, social, news)

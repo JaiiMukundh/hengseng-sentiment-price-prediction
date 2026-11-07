@@ -26,9 +26,23 @@ def direction(score: float, threshold: float) -> str:
     return "NEUTRAL"
 
 
+def _signal(predicted_return: float, threshold: float) -> str:
+    if predicted_return > threshold:
+        return "LONG"
+    if predicted_return < -threshold:
+        return "SHORT"
+    return "FLAT"
+
+
 def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: pd.DataFrame,
                   forecasts: pd.DataFrame, levels: dict[str, dict]) -> pd.DataFrame:
     threshold = cfg.raw["model"]["sentiment_direction"]
+    report_days = cfg.raw["window"].get("social_days", 10)
+    cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=report_days)
+    if not posts.empty:
+        posts = posts[posts["published_utc"] >= cutoff]
+    if not news.empty:
+        news = news[news["published_utc"] >= cutoff]
     rows = []
     for asset in cfg.assets:
         px = prices[prices["ticker"] == asset.ticker].sort_values("date")
@@ -54,6 +68,9 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
             "pred_close_n1": round(float(fc["pred_price"].iloc[0]), 4) if len(fc) else None,
             "pred_move_pct": round(float(fc["pred_ret"].iloc[0]) * 100, 2) if len(fc) else None,
             "signal": fc["signal"].iloc[0] if len(fc) else None,
+            "pred_sent_close_n1": round(float(fc["pred_sent_price"].iloc[0]), 4) if len(fc) and "pred_sent_price" in fc else None,
+            "pred_sent_move_pct": round(float(fc["pred_sent_ret"].iloc[0]) * 100, 2) if len(fc) and "pred_sent_ret" in fc else None,
+            "sent_signal": _signal(fc["pred_sent_ret"].iloc[0], cfg.raw["model"]["signal_threshold"]) if len(fc) and "pred_sent_ret" in fc else None,
             "position": asset.position_label,
             "support": ", ".join(f"{s['level']:.2f}" for s in lv["support"]) or "-",
             "resistance": ", ".join(f"{r['level']:.2f}" for r in lv["resistance"]) or "-",
@@ -66,7 +83,8 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
                  preds: pd.DataFrame, short_metrics: pd.DataFrame | None = None,
                  coefficients: pd.DataFrame | None = None, banner: str | None = None,
                  nested_metrics: pd.DataFrame | None = None,
-                 importances: pd.DataFrame | None = None) -> Path:
+                 importances: pd.DataFrame | None = None,
+                 bootstrap: pd.DataFrame | None = None) -> Path:
     charts = out_dir / "charts"
     charts.mkdir(parents=True, exist_ok=True)
     summary = summary_table(cfg, prices, posts, news, forecasts, levels)
@@ -76,9 +94,10 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
     check = _prediction_check(preds)
     sections.append(
         "<h2>Data coverage</h2>"
-        "<p class='note'>Posts are filtered to the 10-day window. Naver is paginated through its JSON API and "
-        "sampled at up to 80 posts per ticker per day; LIHKG/Telegram coverage depends on keyword discovery. "
-        "The table shows the actual first/last timestamp per feed.</p>"
+        "<p class='note'>The current-sentiment tables use the last 10 days. Model training uses up to 30 days "
+        "of history; Naver is paginated through its JSON API and sampled at up to 80 posts per ticker per day. "
+        "The table shows the actual first/last timestamp per feed; matched_rows counts ticker-post pairs, "
+        "not unique messages.</p>"
         f"{_table(coverage)}"
     )
 
@@ -119,8 +138,13 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
             "is evidence that the sentiment features carry fitted weights, not a statistically robust backtest.</p>"
             f"{_table(short_metrics.round(3))}"
             f"{nested_html}"
-            "<h3>Feature importances (Random Forest)</h3>"
-            "<p class='note'>How much each feature contributes to the short-history model's splits.</p>"
+            "<h3>Session-clustered bootstrap</h3>"
+            "<p class='note'>2.5–97.5% intervals from 1,000 resamples of whole sessions. With only six sessions, "
+            "the intervals are wide by design; they show how fragile the point estimates are.</p>"
+            f"{_table(bootstrap.round(3))}"
+            "<h3>Feature importances / weights</h3>"
+            "<p class='note'>Random Forest split importance, or normalized absolute Ridge coefficients when "
+            "the linear model is configured. Larger values mean the feature contributes more to the prediction.</p>"
             f"{_table(importances.round(4))}"
             "<h3>Ridge coefficients (linear reference)</h3>"
             "<p class='note'>Standardized coefficients from the linear reference model; larger absolute values mean the feature moves the predicted next-session return more.</p>"
@@ -149,14 +173,14 @@ def _coverage(posts: pd.DataFrame, news: pd.DataFrame) -> pd.DataFrame:
     if not posts.empty:
         for (exchange, source), g in posts.groupby(["exchange", "source"]):
             rows.append({
-                "exchange": exchange, "feed": source, "items": len(g),
+                "exchange": exchange, "feed": source, "matched_rows": len(g),
                 "first_utc": g["published_utc"].min().strftime("%Y-%m-%d %H:%M"),
                 "last_utc": g["published_utc"].max().strftime("%Y-%m-%d %H:%M"),
             })
     if not news.empty:
         for exchange, g in news.groupby("exchange"):
             rows.append({
-                "exchange": exchange, "feed": "exa_news", "items": len(g),
+                "exchange": exchange, "feed": "exa_news", "matched_rows": len(g),
                 "first_utc": g["published_utc"].min().strftime("%Y-%m-%d %H:%M"),
                 "last_utc": g["published_utc"].max().strftime("%Y-%m-%d %H:%M"),
             })
@@ -172,8 +196,12 @@ def _prediction_check(preds: pd.DataFrame, n: int = 3) -> pd.DataFrame:
     df["actual_price"] = df["next_close"]
     df["error_pct"] = (df["pred_price"] / df["actual_price"] - 1) * 100
     df["direction_hit"] = (df["pred_ridge_price"].gt(0) == df["y_next_ret"].gt(0))
-    return df[["exchange", "ticker", "date", "pred_price", "actual_price", "error_pct", "direction_hit"]].round(
-        {"pred_price": 2, "actual_price": 2, "error_pct": 2})
+    df["sent_pred_price"] = df["close"] * (1 + df["pred_ridge_sent"])
+    df["sent_error_pct"] = (df["sent_pred_price"] / df["actual_price"] - 1) * 100
+    df["sent_direction_hit"] = (df["pred_ridge_sent"].gt(0) == df["y_next_ret"].gt(0))
+    return df[["exchange", "ticker", "date", "pred_price", "sent_pred_price", "actual_price",
+               "error_pct", "sent_error_pct", "direction_hit", "sent_direction_hit"]].round(
+        {"pred_price": 2, "sent_pred_price": 2, "actual_price": 2, "error_pct": 2, "sent_error_pct": 2})
 
 
 def _table(df: pd.DataFrame) -> str:

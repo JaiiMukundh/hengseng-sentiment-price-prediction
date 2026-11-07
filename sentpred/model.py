@@ -95,13 +95,25 @@ def sentiment_coefficients(df: pd.DataFrame, alpha: float) -> pd.DataFrame:
     return out.reindex(out["coefficient"].abs().sort_values(ascending=False).index).reset_index(drop=True)
 
 
-def sentiment_importances(df: pd.DataFrame, model_name: str = "rf") -> pd.DataFrame:
-    """Feature importances for the non-linear short-history model."""
+def sentiment_importances(df: pd.DataFrame, model_name: str = "rf",
+                          alpha: float = 50) -> pd.DataFrame:
+    """Feature importances for the short-history sentiment model.
+
+    Random Forest importances are impurity based. Ridge importances use the absolute
+    standardized coefficients normalized to sum to one, so both models produce a
+    comparable table.
+    """
     data = _sentiment_rows(df)
     if data.empty:
         return pd.DataFrame(columns=["feature", "importance"])
-    model = _fit(SENTIMENT_MODEL_FEATURES, data, 50, model_name)
-    importances = model.named_steps["randomforestregressor"].feature_importances_
+    model = _fit(SENTIMENT_MODEL_FEATURES, data, alpha, model_name)
+    if model_name == "rf":
+        importances = model.named_steps["randomforestregressor"].feature_importances_
+    else:
+        coefficients = np.abs(model.named_steps["ridge"].coef_)
+        total = coefficients.sum()
+        importances = (coefficients / total if total > 0
+                       else np.full_like(coefficients, 1 / len(coefficients)))
     out = pd.DataFrame({"feature": SENTIMENT_MODEL_FEATURES, "importance": importances})
     return out.sort_values("importance", ascending=False).reset_index(drop=True)
 

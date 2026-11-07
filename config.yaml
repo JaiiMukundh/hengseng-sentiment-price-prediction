@@ -2,7 +2,8 @@
 # Secrets (APIFY_API_TOKEN, EXA_API_KEY) are read from the environment / .env, never from this file.
 
 window:
-  social_days: 10            # social + news look-back window
+  social_days: 10            # current-sentiment report window
+  history_days: 30           # scrape/training window (report stays at social_days)
   price_period: 1y           # price history used for technicals and walk-forward training
 
 exchanges:
@@ -66,7 +67,7 @@ sources:
     exchanges: [HKEX, KRX]
     actor: parseforge~telegram-keyword-search-scraper
     max_items: 200
-    after_date: "10 days"
+    after_date: "30 days"
     discovery:
       HKEX: {language: zh-TW, country: hk}
       KRX: {language: ko, country: kr}
@@ -81,6 +82,8 @@ sources:
     exchanges: [KRX]
     actor: apify~playwright-scraper
     board_url: "https://m.stock.naver.com/front-api/discussion/list?discussionType=domesticStock&itemCode={code}&pageSize=50&isHolderOnly=false&excludesItemNews=false&isItemNewsOnly=false"
+    max_assets_per_run: 1     # one ticker per Actor run, otherwise 5 x 30 days can hit the 60-minute limit
+    timeout_s: 3600
     max_charge_usd: 3
   # Optional KRX source (English TeamBlind). Kept disabled by default: its keyword search returns
   # relevance-ranked posts that are usually older than the 10-day window, and the Actor does not
@@ -95,14 +98,14 @@ sources:
 
 news:
   provider: exa
-  num_results: 10
+  num_results: 20
 
 model:
   min_train_dates: 60        # walk-forward warm-up, in trading sessions
   test_block: 5              # sessions per out-of-sample block
   ridge_alpha: 1.0
-  sentiment_alpha: 50.0    # strong shrinkage for the 60-row short-history sentiment panel
-  sentiment_model: rf      # rf = small Random Forest; ridge = linear reference
+  sentiment_alpha: 10.0    # stronger shrinkage for the short-history sentiment panel
+  sentiment_model: ridge   # ridge = stable linear model; rf available for comparison
   sentiment_shrinkage: 0.5 # calibrate noisy forecasts toward zero
   signal_threshold: 0.005    # |predicted return| above this -> LONG / SHORT, otherwise FLAT
   sentiment_direction: 0.1   # |sentiment score| above this -> BULLISH / BEARISH

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentpred"
+version = "0.1.0"
+description = "Social and news sentiment pipeline for HKEX/KRX next-session price prediction"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Jaii Mukundh" }]
+dependencies = [
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+    "matplotlib>=3.8",
+    "requests>=2.31",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "yfinance>=0.2.40",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+sentpred = "sentpred.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sentpred*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

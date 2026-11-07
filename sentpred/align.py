@@ -28,7 +28,7 @@ def map_to_session(published_utc: pd.Series, tz: str, close: str, sessions: pd.D
 
     sess = sessions.values
     idx = np.searchsorted(sess, day.values, side="left")
-    valid = idx < len(sess)
+    valid = (idx < len(sess)) & (day.values >= sess[0])
     mapped = np.full(len(day), np.datetime64("NaT", "ns"))
     mapped[valid] = sess[idx[valid]]
     return pd.Series(mapped, index=published_utc.index)
