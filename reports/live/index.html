@@ -11,7 +11,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
 .note{color:#555;font-size:13px}
 </style></head><body>
 <h1>HengSeng Sentiment Price Prediction</h1>
-<div class="note">Generated 2026-11-07 14:16 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
+<div class="note">Generated 2026-11-07 14:17 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
 <div class='banner'>Sentiment history covers 7 session(s). Below 60 sessions the pipeline reports a pooled leave-one-session-out model as short-history evidence, not a full walk-forward.</div>
 <h2>Data coverage</h2><p class='note'>Posts are filtered to the 10-day window. Naver is paginated through its JSON API and sampled at up to 80 posts per ticker per day; LIHKG/Telegram coverage depends on keyword discovery. The table shows the actual first/last timestamp per feed.</p><table class="dataframe table">
   <thead>
@@ -647,6 +647,81 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>3.938</td>
       <td>58.974</td>
       <td>-2.111</td>
+    </tr>
+  </tbody>
+</table><h3>Hyperparameter sensitivity (nested)</h3><p class='note'>Alpha chosen by inner leave-one-session-out inside each training fold. This removes the tuning advantage; a result close to the naive baseline is expected at this sample size.</p><table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>subset</th>
+      <th>model</th>
+      <th>n</th>
+      <th>mae_price</th>
+      <th>rmse_price</th>
+      <th>mape_pct</th>
+      <th>direction_acc_pct</th>
+      <th>skill_vs_naive_pct</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>all</td>
+      <td>naive</td>
+      <td>60</td>
+      <td>10775.194</td>
+      <td>30647.775</td>
+      <td>3.255</td>
+      <td>-</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <td>all</td>
+      <td>ridge_price</td>
+      <td>60</td>
+      <td>11420.028</td>
+      <td>29681.946</td>
+      <td>3.404</td>
+      <td>70.000</td>
+      <td>-4.591</td>
+    </tr>
+    <tr>
+      <td>all</td>
+      <td>ridge_sent</td>
+      <td>60</td>
+      <td>11053.277</td>
+      <td>29919.436</td>
+      <td>3.280</td>
+      <td>60.000</td>
+      <td>-0.774</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>naive</td>
+      <td>39</td>
+      <td>16575.682</td>
+      <td>38013.886</td>
+      <td>3.856</td>
+      <td>-</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>ridge_price</td>
+      <td>39</td>
+      <td>17567.808</td>
+      <td>36815.923</td>
+      <td>4.065</td>
+      <td>66.667</td>
+      <td>-5.425</td>
+    </tr>
+    <tr>
+      <td>social_window</td>
+      <td>ridge_sent</td>
+      <td>39</td>
+      <td>17003.687</td>
+      <td>37110.493</td>
+      <td>3.978</td>
+      <td>48.718</td>
+      <td>-3.153</td>
     </tr>
   </tbody>
 </table><h3>Standardized coefficients</h3><p class='note'>Standardized Ridge coefficients; larger absolute values mean the feature moves the predicted next-session return more.</p><table class="dataframe table">

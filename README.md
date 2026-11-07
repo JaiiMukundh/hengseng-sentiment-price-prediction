@@ -110,8 +110,8 @@ Live run, both exchanges, 10-day window: **4,370 social posts** (Naver 4,278 acr
 
 - Social sentiment: bearish HK tech (Meituan -0.67, Alibaba -0.43, Xiaomi -0.36, Tencent -0.27); Korean boards near neutral (Kakao -0.05; Samsung, SK hynix, NAVER, Hyundai within ±0.03).
 - Long walk-forward over 1,685 pooled rows: naive baseline MAPE **2.656%**; `ridge_price` **2.673%** (direction 52.4%); `ridge_sent` **2.679%**.
-- **Short-history sentiment panel** (6 sessions x 10 tickers = 60 rows, pooled leave-one-session-out): naive **3.255%**, sentiment model **3.229%** (skill +0.8%, direction **68.3%**). Standardized coefficients include `social_sent_wmean` -0.0054, `social_n_log` -0.0042 and `news_sent_wmean` -0.0037, so the sentiment features carry real fitted weights (negative signs are a contrarian tilt). This is a small-sample result, not a robust edge.
-- Snapshot: [`reports/live/index.html`](reports/live/index.html) (self-contained; no usernames or raw posts). It includes a **data-coverage table**, the **short-history model metrics and coefficients**, and a **prediction-check table** comparing recent out-of-sample forecasts with actual next closes.
+- **Short-history sentiment panel** (6 sessions x 10 tickers = 60 rows, pooled leave-one-session-out): fixed alpha=50 gives **3.229%** MAPE vs naive **3.255%** (+0.8% skill) and **68.3%** direction accuracy. A nested check that picks alpha inside each training fold gives **3.280%** (-0.8% skill) and 60.0% direction, so there is **no reliable MAPE edge** at this sample size. Standardized coefficients still show real fitted weights: `social_sent_wmean` -0.0054, `social_n_log` -0.0042 and `news_sent_wmean` -0.0037 (negative signs are a contrarian tilt).
+- Snapshot: [`reports/live/index.html`](reports/live/index.html) (self-contained; no usernames or raw posts). It includes a **data-coverage table**, both **short-history model tables**, the **coefficients**, and a **prediction-check table** comparing recent out-of-sample forecasts with actual next closes.
 
 ## Running it daily
 
@@ -124,7 +124,7 @@ Social sentiment is only available for the look-back window, so a single run giv
 
 ## Limitations
 
-- **Short history.** Ten days of social data gives only 6–7 sessions. The pooled leave-one-session-out sentiment model is illustrative, not statistically robust, and its hyperparameters were chosen on that same small panel. Treat the +0.8% MAPE skill as a signal that the pipeline works, not as a proven edge.
+- **Short history.** Ten days of social data gives only 6–7 sessions. The pooled leave-one-session-out sentiment model is illustrative, not statistically robust. Its fixed-alpha result is +0.8% MAPE skill, but nested alpha selection gives -0.8%; the honest conclusion is that the features have real weights but no proven price edge yet.
 - **Lexicon sentiment.** It has no negation handling and no sarcasm detection, and Korean slang coverage is limited. A multilingual finance model would be more accurate.
 - **Model.** Linear Ridge on a small sample; the expected edge is small and the report always shows the naive baseline next to it.
 - **Calendars.** Exchange holidays are not modelled. Sessions are the price bars plus the next business day.

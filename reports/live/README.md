@@ -8,6 +8,7 @@ No usernames or raw post text are included here; raw data stays in the git-ignor
 - `model_metrics.csv` - long walk-forward comparison against the naive baseline
 - `forecasts.csv` - next-session predictions (price model + sentiment model)
 - `short_history_metrics.csv` - pooled leave-one-session-out sentiment model, 6 sessions x 10 tickers
+- `sentiment_nested_metrics.csv` - nested alpha-selection sensitivity check
 - `sentiment_coefficients.csv` - standardized Ridge coefficients for the sentiment features
 
 History covers 6-7 trading sessions, below the 60 a full walk-forward needs. The pipeline reports

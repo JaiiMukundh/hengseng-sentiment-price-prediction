@@ -149,16 +149,22 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     sent_sessions = int(dataset.loc[dataset["has_social"] + dataset["has_news"] > 0, "date"].nunique())
 
     short_metrics = None
+    nested_metrics = None
     coefficients = None
     if sent_sessions < mcfg["min_train_dates"]:
         sent_alpha = mcfg.get("sentiment_alpha", 50)
         sent_shrink = mcfg.get("sentiment_shrinkage", 0.5)
         short_preds, short_dates = model.leave_one_session_out(dataset, sent_alpha, sent_shrink)
         short_metrics = model.evaluate(short_preds)
+        nested = model.nested_sentiment_predictions(dataset, shrink=sent_shrink)
+        nested = nested.merge(short_preds[["date", "ticker", "pred_ridge_price"]], on=["date", "ticker"], how="left")
+        nested["pred_naive"] = 0.0
+        nested_metrics = model.evaluate(nested.dropna(subset=["pred_ridge_price", "pred_ridge_sent"]))
         coefficients = model.sentiment_coefficients(dataset, sent_alpha)
         forecasts = forecasts.merge(
             model.sentiment_forecast(dataset, sent_alpha, sent_shrink), on="ticker", how="left")
         short_metrics.to_csv(paths.processed / "short_history_metrics.csv", index=False)
+        nested_metrics.to_csv(paths.processed / "sentiment_nested_metrics.csv", index=False)
         coefficients.to_csv(paths.processed / "sentiment_coefficients.csv", index=False)
         log.info("short-history sentiment model: %d sessions, %d rows; coefficients written",
                  short_dates, len(short_preds))
@@ -183,7 +189,7 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
              len(preds), forecasts["model_used"].iloc[0] if len(forecasts) else "n/a")
     return {"prices": prices, "posts": posts, "news": news, "forecasts": forecasts,
             "levels": lvl, "metrics": metrics, "preds": preds, "sent_sessions": sent_sessions,
-            "short_metrics": short_metrics, "coefficients": coefficients}
+            "short_metrics": short_metrics, "nested_metrics": nested_metrics, "coefficients": coefficients}
 
 
 def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> Path:
@@ -196,7 +202,7 @@ def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> 
     banner = " ".join(filter(None, [banner, coverage]))
     path = write_report(paths.report, cfg, state["prices"], state["posts"], state["news"],
                         state["forecasts"], state["levels"], state["metrics"], state["preds"],
-                        state["short_metrics"], state["coefficients"], banner)
+                        state["short_metrics"], state["coefficients"], banner, state["nested_metrics"])
     log.info("report written to %s", path)
     return path
 

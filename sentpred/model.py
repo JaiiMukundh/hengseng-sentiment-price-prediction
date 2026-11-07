@@ -100,6 +100,32 @@ def sentiment_forecast(df: pd.DataFrame, alpha: float, shrink: float = 1.0) -> p
     return latest[["ticker", "pred_sent_ret", "pred_sent_price"]]
 
 
+def nested_sentiment_predictions(df: pd.DataFrame, alphas: tuple[float, ...] = (10, 30, 50, 100, 300),
+                                 shrink: float = 0.5) -> pd.DataFrame:
+    """Sensitivity check: choose alpha by inner leave-one-session-out inside each outer fold."""
+    data = _sentiment_rows(df)
+    out = data.copy()
+    out["pred_ridge_sent"] = np.nan
+    for session in sorted(data["date"].unique()):
+        train = data[data["date"] != session].reset_index(drop=True)
+        test = data[data["date"] == session]
+        best_alpha, best_mape = alphas[0], np.inf
+        for alpha in alphas:
+            inner = np.zeros(len(train))
+            for inner_session in sorted(train["date"].unique()):
+                inner_train = train[train["date"] != inner_session]
+                inner_test = train["date"] == inner_session
+                inner[inner_test.values] = _fit(SENTIMENT_MODEL_FEATURES, inner_train, alpha).predict(
+                    train.loc[inner_test, SENTIMENT_MODEL_FEATURES])
+            mape = ((train["close"] * (1 + shrink * inner) - train["next_close"]).abs()
+                    / train["next_close"]).mean()
+            if mape < best_mape:
+                best_alpha, best_mape = alpha, mape
+        out.loc[test.index, "pred_ridge_sent"] = (
+            _fit(SENTIMENT_MODEL_FEATURES, train, best_alpha).predict(test[SENTIMENT_MODEL_FEATURES]) * shrink)
+    return out
+
+
 def evaluate(preds: pd.DataFrame) -> pd.DataFrame:
     rows = []
     subsets = {"all": preds, "social_window": preds[preds["has_social"] > 0]}

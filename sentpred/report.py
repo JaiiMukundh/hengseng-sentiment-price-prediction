@@ -64,7 +64,8 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
 def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: pd.DataFrame,
                  forecasts: pd.DataFrame, levels: dict[str, dict], metrics: pd.DataFrame,
                  preds: pd.DataFrame, short_metrics: pd.DataFrame | None = None,
-                 coefficients: pd.DataFrame | None = None, banner: str | None = None) -> Path:
+                 coefficients: pd.DataFrame | None = None, banner: str | None = None,
+                 nested_metrics: pd.DataFrame | None = None) -> Path:
     charts = out_dir / "charts"
     charts.mkdir(parents=True, exist_ok=True)
     summary = summary_table(cfg, prices, posts, news, forecasts, levels)
@@ -102,12 +103,21 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
     metric_view = metrics.round(3)
     short_html = ""
     if short_metrics is not None and not short_metrics.empty:
+        nested_html = ""
+        if nested_metrics is not None and not nested_metrics.empty:
+            nested_html = (
+                "<h3>Hyperparameter sensitivity (nested)</h3>"
+                "<p class='note'>Alpha chosen by inner leave-one-session-out inside each training fold. "
+                "This removes the tuning advantage; a result close to the naive baseline is expected at this sample size.</p>"
+                f"{_table(nested_metrics.round(3))}"
+            )
         short_html = (
             "<h2>Sentiment model - short-history panel</h2>"
             "<p class='note'>Pooled leave-one-session-out over the sessions that have social/news data. "
             "Every row is predicted by a model trained on the other sessions. With fewer than 60 sessions this "
             "is evidence that the sentiment features carry fitted weights, not a statistically robust backtest.</p>"
             f"{_table(short_metrics.round(3))}"
+            f"{nested_html}"
             "<h3>Standardized coefficients</h3>"
             "<p class='note'>Standardized Ridge coefficients; larger absolute values mean the feature moves the "
             "predicted next-session return more.</p>"
