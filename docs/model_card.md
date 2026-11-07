@@ -73,6 +73,7 @@ The 30-day run is the current evidence. A previous 10-day snapshot showed 73% di
 - Exchange holidays are not explicitly modeled.
 - Market context features were tested but omitted because they worsened out-of-sample MAPE; they remain in the dataset for experiments.
 - The product/business claims of the company are unrelated to this model's validity.
+- An extended edge audit (30-day social, 365-day news, cross-sectional targets, four model families, 10/25/50 bps costs, bootstrap) found **no reliable edge**. The social point estimate is positive but its 95% interval includes zero; news has no edge after costs; the only apparent winner was a constant-prediction artifact. See `reports/research/README.md`.
 
 ## Ethical / regulatory
 

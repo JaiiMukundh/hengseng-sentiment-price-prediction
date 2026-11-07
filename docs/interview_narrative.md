@@ -62,5 +62,6 @@
 - “This predicts stock prices accurately.”
 - “73% win rate.”
 - “This is a trading strategy.”
+- “I found a reliable sentiment edge.”
 
 Say instead: “It is a reproducible research pipeline that tests whether sentiment adds value, and reports the answer honestly.”
