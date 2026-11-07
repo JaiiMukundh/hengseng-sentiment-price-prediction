@@ -62,7 +62,7 @@ Exa (`POST https://api.exa.ai/search`, `category: news`, `startPublishedDate` se
 
 **Support and resistance.** Swing highs and lows over 120 sessions, clustered within 1.5%, split around the last close. Classic daily pivots (P, R1, R2, S1, S2) are included.
 
-**Position.** The report has a `position` column set to "none (not provided)". Your own positions can be added to the summary table if you want them shown.
+**Position.** The report shows each asset's position from the `positions` block in `config.yaml` (`flat` when empty). Add entries as `{quantity: 200, avg_price: 410.5}` to populate it.
 
 ## The report
 

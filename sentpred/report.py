@@ -45,7 +45,8 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
             "exchange": asset.exchange,
             "ticker": asset.ticker,
             "name": asset.name,
-            "last_close": round(float(last["close"]), 4),
+            "current_price": round(float(last["close"]), 4),
+            "as_of": pd.Timestamp(last["date"]).date().isoformat(),
             "social_mentions": len(social),
             "news_items": len(news_t),
             "sentiment": round(sent, 3),
@@ -53,7 +54,7 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
             "pred_close_n1": round(float(fc["pred_price"].iloc[0]), 4) if len(fc) else None,
             "pred_move_pct": round(float(fc["pred_ret"].iloc[0]) * 100, 2) if len(fc) else None,
             "signal": fc["signal"].iloc[0] if len(fc) else None,
-            "position": "none (not provided)",
+            "position": asset.position_label,
             "support": ", ".join(f"{s['level']:.2f}" for s in lv["support"]) or "-",
             "resistance": ", ".join(f"{r['level']:.2f}" for r in lv["resistance"]) or "-",
         })

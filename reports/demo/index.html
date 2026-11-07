@@ -11,7 +11,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
 .note{color:#555;font-size:13px}
 </style></head><body>
 <h1>HengSeng Sentiment Price Prediction</h1>
-<div class="note">Generated 2026-11-07 11:33 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
+<div class="note">Generated 2026-11-07 11:40 UTC. Not investment advice. Predictions are model outputs from a walk-forward backtest.</div>
 <div class='banner'>DEMO: synthetic data for pipeline testing. Not real market or social data. Sentiment history covers 7 session(s); the sentiment model needs 60. Until then, the sentiment model&#x27;s weights are untrained and its results are not meaningful.</div>
 <h2>HKEX</h2><h3>Ranked by social mentions</h3><table class="dataframe table">
   <thead>
@@ -19,7 +19,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <th>exchange</th>
       <th>ticker</th>
       <th>name</th>
-      <th>last_close</th>
+      <th>current_price</th>
+      <th>as_of</th>
       <th>social_mentions</th>
       <th>news_items</th>
       <th>sentiment</th>
@@ -38,6 +39,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>0700.HK</td>
       <td>Tencent Holdings</td>
       <td>150.8250</td>
+      <td>2026-11-06</td>
       <td>111</td>
       <td>26</td>
       <td>0.207</td>
@@ -45,7 +47,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>151.0336</td>
       <td>0.14</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>146.95</td>
       <td>164.29, 169.40</td>
     </tr>
@@ -54,6 +56,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>9988.HK</td>
       <td>Alibaba Group</td>
       <td>299.1110</td>
+      <td>2026-11-06</td>
       <td>84</td>
       <td>12</td>
       <td>0.214</td>
@@ -61,7 +64,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>299.2330</td>
       <td>0.04</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>295.48, 291.10</td>
       <td>301.50, 315.96</td>
     </tr>
@@ -70,6 +73,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>1810.HK</td>
       <td>Xiaomi</td>
       <td>180.7881</td>
+      <td>2026-11-06</td>
       <td>56</td>
       <td>9</td>
       <td>0.125</td>
@@ -77,7 +81,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>180.8441</td>
       <td>0.03</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>174.89, 171.56</td>
       <td>182.11</td>
     </tr>
@@ -86,6 +90,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>3690.HK</td>
       <td>Meituan</td>
       <td>273.5098</td>
+      <td>2026-11-06</td>
       <td>50</td>
       <td>10</td>
       <td>-0.060</td>
@@ -93,7 +98,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>273.3895</td>
       <td>-0.04</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>266.77, 261.68</td>
       <td>276.79, 282.89</td>
     </tr>
@@ -102,6 +107,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>0005.HK</td>
       <td>HSBC Holdings</td>
       <td>34.1723</td>
+      <td>2026-11-06</td>
       <td>43</td>
       <td>9</td>
       <td>0.302</td>
@@ -109,7 +115,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>34.1229</td>
       <td>-0.14</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>33.18</td>
       <td>34.47, 36.36</td>
     </tr>
@@ -120,7 +126,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <th>exchange</th>
       <th>ticker</th>
       <th>name</th>
-      <th>last_close</th>
+      <th>current_price</th>
+      <th>as_of</th>
       <th>social_mentions</th>
       <th>news_items</th>
       <th>sentiment</th>
@@ -139,6 +146,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>0005.HK</td>
       <td>HSBC Holdings</td>
       <td>34.1723</td>
+      <td>2026-11-06</td>
       <td>43</td>
       <td>9</td>
       <td>0.302</td>
@@ -146,7 +154,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>34.1229</td>
       <td>-0.14</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>33.18</td>
       <td>34.47, 36.36</td>
     </tr>
@@ -155,6 +163,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>9988.HK</td>
       <td>Alibaba Group</td>
       <td>299.1110</td>
+      <td>2026-11-06</td>
       <td>84</td>
       <td>12</td>
       <td>0.214</td>
@@ -162,7 +171,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>299.2330</td>
       <td>0.04</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>295.48, 291.10</td>
       <td>301.50, 315.96</td>
     </tr>
@@ -171,6 +180,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>0700.HK</td>
       <td>Tencent Holdings</td>
       <td>150.8250</td>
+      <td>2026-11-06</td>
       <td>111</td>
       <td>26</td>
       <td>0.207</td>
@@ -178,7 +188,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>151.0336</td>
       <td>0.14</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>146.95</td>
       <td>164.29, 169.40</td>
     </tr>
@@ -187,6 +197,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>1810.HK</td>
       <td>Xiaomi</td>
       <td>180.7881</td>
+      <td>2026-11-06</td>
       <td>56</td>
       <td>9</td>
       <td>0.125</td>
@@ -194,7 +205,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>180.8441</td>
       <td>0.03</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>174.89, 171.56</td>
       <td>182.11</td>
     </tr>
@@ -203,6 +214,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>3690.HK</td>
       <td>Meituan</td>
       <td>273.5098</td>
+      <td>2026-11-06</td>
       <td>50</td>
       <td>10</td>
       <td>-0.060</td>
@@ -210,7 +222,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>273.3895</td>
       <td>-0.04</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>266.77, 261.68</td>
       <td>276.79, 282.89</td>
     </tr>
@@ -221,7 +233,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <th>exchange</th>
       <th>ticker</th>
       <th>name</th>
-      <th>last_close</th>
+      <th>current_price</th>
+      <th>as_of</th>
       <th>social_mentions</th>
       <th>news_items</th>
       <th>sentiment</th>
@@ -240,6 +253,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>035420.KS</td>
       <td>NAVER</td>
       <td>94.2943</td>
+      <td>2026-11-06</td>
       <td>114</td>
       <td>27</td>
       <td>0.184</td>
@@ -247,7 +261,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>94.2936</td>
       <td>-0.00</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>93.45, 89.02</td>
       <td>97.74</td>
     </tr>
@@ -256,6 +270,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>005930.KS</td>
       <td>Samsung Electronics</td>
       <td>79.8575</td>
+      <td>2026-11-06</td>
       <td>107</td>
       <td>22</td>
       <td>0.215</td>
@@ -263,7 +278,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>79.9258</td>
       <td>0.09</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>74.67, 72.37</td>
       <td>86.73</td>
     </tr>
@@ -272,6 +287,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>005380.KS</td>
       <td>Hyundai Motor</td>
       <td>78.8889</td>
+      <td>2026-11-06</td>
       <td>105</td>
       <td>19</td>
       <td>0.057</td>
@@ -279,7 +295,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>78.8861</td>
       <td>-0.00</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>77.37, 73.63</td>
       <td>79.40, 81.15</td>
     </tr>
@@ -288,6 +304,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>000660.KS</td>
       <td>SK hynix</td>
       <td>270.3839</td>
+      <td>2026-11-06</td>
       <td>65</td>
       <td>12</td>
       <td>-0.169</td>
@@ -295,7 +312,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>270.3890</td>
       <td>0.00</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>250.77</td>
       <td>273.53, 283.17</td>
     </tr>
@@ -304,6 +321,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>035720.KS</td>
       <td>Kakao</td>
       <td>313.8504</td>
+      <td>2026-11-06</td>
       <td>40</td>
       <td>9</td>
       <td>0.375</td>
@@ -311,7 +329,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>313.8993</td>
       <td>0.02</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>311.45, 300.25</td>
       <td>319.93, 327.49</td>
     </tr>
@@ -322,7 +340,8 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <th>exchange</th>
       <th>ticker</th>
       <th>name</th>
-      <th>last_close</th>
+      <th>current_price</th>
+      <th>as_of</th>
       <th>social_mentions</th>
       <th>news_items</th>
       <th>sentiment</th>
@@ -341,6 +360,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>035720.KS</td>
       <td>Kakao</td>
       <td>313.8504</td>
+      <td>2026-11-06</td>
       <td>40</td>
       <td>9</td>
       <td>0.375</td>
@@ -348,7 +368,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>313.8993</td>
       <td>0.02</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>311.45, 300.25</td>
       <td>319.93, 327.49</td>
     </tr>
@@ -357,6 +377,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>005930.KS</td>
       <td>Samsung Electronics</td>
       <td>79.8575</td>
+      <td>2026-11-06</td>
       <td>107</td>
       <td>22</td>
       <td>0.215</td>
@@ -364,7 +385,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>79.9258</td>
       <td>0.09</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>74.67, 72.37</td>
       <td>86.73</td>
     </tr>
@@ -373,6 +394,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>035420.KS</td>
       <td>NAVER</td>
       <td>94.2943</td>
+      <td>2026-11-06</td>
       <td>114</td>
       <td>27</td>
       <td>0.184</td>
@@ -380,7 +402,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>94.2936</td>
       <td>-0.00</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>93.45, 89.02</td>
       <td>97.74</td>
     </tr>
@@ -389,6 +411,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>005380.KS</td>
       <td>Hyundai Motor</td>
       <td>78.8889</td>
+      <td>2026-11-06</td>
       <td>105</td>
       <td>19</td>
       <td>0.057</td>
@@ -396,7 +419,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>78.8861</td>
       <td>-0.00</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>77.37, 73.63</td>
       <td>79.40, 81.15</td>
     </tr>
@@ -405,6 +428,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>000660.KS</td>
       <td>SK hynix</td>
       <td>270.3839</td>
+      <td>2026-11-06</td>
       <td>65</td>
       <td>12</td>
       <td>-0.169</td>
@@ -412,7 +436,7 @@ table.table th{background:#f0f4fa} img{max-width:100%}
       <td>270.3890</td>
       <td>0.00</td>
       <td>FLAT</td>
-      <td>none (not provided)</td>
+      <td>flat</td>
       <td>250.77</td>
       <td>273.53, 283.17</td>
     </tr>

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from sentpred.config import Asset
+from sentpred.config import Asset, load_config
 from sentpred.sentiment import mentions_asset, score_text
 from sentpred.sources import _timestamp, build_run_input, normalize
 
@@ -87,3 +87,17 @@ def test_build_run_input_lihkg_uses_search_mode():
     assert run["mode"] == "search"
     assert "Tencent" in run["keywords"]
     assert all(not k.startswith("$") for k in run["keywords"])
+
+
+def test_config_has_five_assets_per_exchange_and_two_sources_each():
+    cfg = load_config()
+    for exchange in ("HKEX", "KRX"):
+        assert len(cfg.assets_for(exchange)) == 5
+        sources = [name for name, src in cfg.raw["sources"].items() if src.get("enabled") and exchange in src["exchanges"]]
+        assert len(sources) == 2, (exchange, sources)
+
+
+def test_position_label_defaults_to_flat_and_formats_holdings():
+    assert Asset("HKEX", "0700.HK", "Tencent", ("Tencent",)).position_label == "flat"
+    held = Asset("HKEX", "0700.HK", "Tencent", ("Tencent",), {"quantity": 200, "avg_price": 410.5})
+    assert held.position_label == "200 @ 410.5"

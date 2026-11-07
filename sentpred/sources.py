@@ -59,7 +59,7 @@ def build_run_input(source: str, cfg: dict[str, Any], exchange: str, assets: tup
             "keywords": keywords,
             "maxItems": cfg["max_items"],
             "order": "desc_reply_time",
-            "dateFrom": cfg.get("date_from", "2w"),
+            "dateFrom": cfg.get("date_from", f"{social_days}d"),
             "aiLabels": False,
         }
     if source == "telegram":

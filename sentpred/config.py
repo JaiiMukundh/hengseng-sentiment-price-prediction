@@ -18,10 +18,19 @@ class Asset:
     ticker: str
     name: str
     keywords: tuple[str, ...]
+    position: dict[str, Any] | None = None
 
     @property
     def code(self) -> str:
         return self.ticker.split(".")[0]
+
+    @property
+    def position_label(self) -> str:
+        if not self.position or not self.position.get("quantity"):
+            return "flat"
+        quantity = self.position["quantity"]
+        entry = self.position.get("avg_price")
+        return f"{quantity:g} @ {entry:g}" if entry is not None else f"{quantity:g} shares"
 
 
 @dataclass(frozen=True)
@@ -45,12 +54,14 @@ class Config:
 
 def load_config(path: str | Path = ROOT / "config.yaml") -> Config:
     raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    positions = raw.get("positions", {})
     assets = tuple(
         Asset(
             exchange=ex_code,
             ticker=a["ticker"],
             name=a["name"],
             keywords=tuple(a["keywords"]),
+            position=a.get("position") or positions.get(ex_code, {}).get(a["ticker"]),
         )
         for ex_code, ex in raw["exchanges"].items()
         for a in ex["assets"]

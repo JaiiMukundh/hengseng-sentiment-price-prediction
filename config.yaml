@@ -45,6 +45,12 @@ exchanges:
         name: Hyundai Motor
         keywords: ["Hyundai Motor", "현대차", "현대자동차"]
 
+# Optional holdings, shown in the report's position column. Set quantity to 0 or remove the entry if flat.
+# You can also put `position: {quantity: N, avg_price: X}` directly on an asset above.
+positions:
+  HKEX: {}
+  KRX: {}
+
 sources:
   # Social source 1 for HKEX (LIHKG forum keyword search)
   lihkg:
@@ -52,7 +58,7 @@ sources:
     exchanges: [HKEX]
     actor: claude_code_reviewer~lihkg-scraper
     max_items: 100
-    date_from: 2w
+    date_from: 10d
     max_charge_usd: 3
   # Social source 2 for HKEX (Telegram keyword search across public channels)
   telegram:
@@ -81,7 +87,7 @@ sources:
     exchanges: [KRX]
     actor: hypebridge~blind-post-scraper
     search_url: "https://www.teamblind.com/kr/search/{query}"
-    max_items: 200
+    max_items: 100            # $18 per 1,000 posts on this Actor - keep it tight
     max_charge_usd: 3
 
 news:
