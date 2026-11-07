@@ -30,7 +30,7 @@ Assets, keywords and exchange calendars live in `config.yaml`.
 | Exchange | Source | Apify Actor ID | Actor input |
 |---|---|---|---|
 | HKEX | LIHKG forum keyword search | `claude_code_reviewer~lihkg-scraper` (`pwCnD34epqg3YfeMB`) | `mode: search`, `keywords`, `maxItems`, `dateFrom` |
-| HKEX | Telegram public channels | `tri_angle~telegram-scraper` (`GEHKCq8O4orlPjLFf`) | `profiles` (channel list), `scrapeLastNDays` |
+| HKEX | Telegram keyword search (public channels) | `parseforge~telegram-keyword-search-scraper` | `keywords` (tickers, cashtags, names), `discoverChannels: true`, `afterDate`, discovery language/country `zh-HK`/`hk` |
 | KRX | Naver Finance stock discussion board (종목토론실) | `apify~playwright-scraper` with the custom `pageFunction` in `sentpred/sources.py` | `startUrls` (one per asset per page) |
 | KRX | Blind (Korean feed, keyword search) | `hypebridge~blind-post-scraper` (`h4IM5lZDxLlFcQ3yx`) | `startUrls` (search URL per asset), `maxItems` |
 
@@ -87,9 +87,8 @@ Keys are read from the environment or `.env`. Never commit `.env`. `data/` (raw 
 
 ### Configuration to complete before a live run
 
-1. **Telegram channels.** Set `sources.telegram.channels.HKEX` in `config.yaml` to the public HK channels you want scraped. The pipeline does not guess channel names.
-2. **Blind search URL.** `sources.blind.search_url` is a template. Check the URL pattern on the first run, because Blind's Korean search path can change.
-3. **Naver selectors.** The board renders client-side. `NAVER_PAGE_FUNCTION` in `sentpred/sources.py` targets the classic `table.type2` layout and must be checked on a live run. Set `pages: 1` in `config.yaml` for a first test, and inspect the raw output in `data/raw/naver_discussion_KRX.json`.
+1. **Blind search URL.** `sources.blind.search_url` is a template. Check the URL pattern on the first run, because Blind's Korean search path can change.
+2. **Naver selectors.** The board renders client-side. `NAVER_PAGE_FUNCTION` in `sentpred/sources.py` targets the classic `table.type2` layout and must be checked on a live run. Set `pages: 1` in `config.yaml` for a first test, and inspect the raw output in `data/raw/naver_discussion_KRX.json`.
 
 ## Running it daily
 
@@ -106,7 +105,7 @@ Social sentiment is only available for the look-back window, so a single run giv
 - **Lexicon sentiment.** It has no negation handling and no sarcasm detection. A multilingual finance model would be more accurate.
 - **Model.** It is a linear model on a small sample. The expected edge is small, and the report shows whether it beats the naive baseline.
 - **Calendars.** Exchange holidays are not modelled. Sessions are the price bars plus the next business day.
-- **Telegram** only covers the channels you list. It does not search by ticker.
+- **Telegram** coverage depends on its channel discovery (a web search restricted to `t.me`). You can add specific public channels in `config.yaml` to guarantee they are searched.
 
 ## Repository layout
 

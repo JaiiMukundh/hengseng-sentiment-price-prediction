@@ -72,9 +72,13 @@ def test_normalize_naver_nested_posts_uses_kst():
     assert df.iloc[0]["published_utc"] == pd.Timestamp("2026-11-06 01:30:00", tz="UTC")
 
 
-def test_build_run_input_telegram_skipped_without_channels():
-    cfg = {"channels": {"HKEX": []}}
-    assert build_run_input("telegram", cfg, "HKEX", (TENCENT,), 10) is None
+def test_build_run_input_telegram_uses_keyword_search_without_channel_list():
+    cfg = {"channels": {"HKEX": []}, "discovery_language": "zh-HK", "discovery_country": "hk"}
+    run = build_run_input("telegram", cfg, "HKEX", (TENCENT,), 10)
+    assert run["discoverChannels"] is True
+    assert run["channels"] == []
+    assert run["afterDate"] == "10 days"
+    assert "Tencent" in run["keywords"] and "$0700" in run["keywords"]
 
 
 def test_build_run_input_lihkg_uses_search_mode():

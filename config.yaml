@@ -54,13 +54,18 @@ sources:
     max_items: 100
     date_from: 2w
     max_charge_usd: 3
-  # Social source 2 for HKEX (Telegram public channels; fill the channel list)
+  # Social source 2 for HKEX (Telegram keyword search across public channels)
   telegram:
     enabled: true
     exchanges: [HKEX]
-    actor: tri_angle~telegram-scraper
+    actor: parseforge~telegram-keyword-search-scraper
+    max_items: 200
+    after_date: "10 days"
+    discovery_language: zh-HK
+    discovery_country: hk
+    # Optional: extra public channels searched on top of auto-discovery. Leave empty.
     channels:
-      HKEX: []               # e.g. ["@some_hk_stock_channel"] - required, no default channels are guessed
+      HKEX: []
     max_charge_usd: 3
   # Social source 1 for KRX (Naver Finance stock discussion board, JS-rendered)
   naver_discussion:

@@ -64,10 +64,18 @@ def build_run_input(source: str, cfg: dict[str, Any], exchange: str, assets: tup
         }
     if source == "telegram":
         channels = cfg.get("channels", {}).get(exchange, [])
-        if not channels:
-            log.warning("telegram: no channels configured for %s; skipping", exchange)
-            return None
-        return {"profiles": channels, "collectMessages": True, "scrapeLastNDays": social_days}
+        return {
+            "keywords": sorted({k for a in assets for k in a.keywords}),
+            "discoverChannels": True,
+            "channels": channels,
+            "maxChannelsPerKeyword": 20,
+            "maxItems": cfg.get("max_items", 200),
+            "searchDepth": "fast",
+            "afterDate": cfg.get("after_date", f"{social_days} days"),
+            "discoveryLanguage": cfg.get("discovery_language", "en"),
+            "discoveryCountry": cfg.get("discovery_country", "us"),
+            "strictMatch": True,
+        }
     if source == "naver_discussion":
         urls = [
             {"url": cfg["board_url"].format(code=a.code, page=p)}
