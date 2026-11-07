@@ -1,0 +1,5 @@
+# Optional research-only dependencies (not needed for the production pipeline or CI).
+# Install PyTorch CPU first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+transformers>=4.40
+sentencepiece>=0.2

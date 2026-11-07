@@ -41,11 +41,13 @@ def engagement_weight(posts: pd.DataFrame) -> pd.Series:
     return (1 + np.log1p(engagement)) * (1 + reach / 10)
 
 
-def aggregate(posts: pd.DataFrame, calendars: dict[str, tuple[str, str, pd.DatetimeIndex]], prefix: str) -> pd.DataFrame:
+def aggregate(posts: pd.DataFrame, calendars: dict[str, tuple[str, str, pd.DatetimeIndex]], prefix: str,
+              score_col: str | None = None) -> pd.DataFrame:
     """Aggregate posts to one row per (ticker, session date).
 
     calendars maps exchange -> (tz, close, sessions).
     Columns are prefixed (e.g. "social_", "news_") so the two feeds can be joined.
+    If score_col is provided, use those precomputed scores instead of the lexicon.
     """
     empty = pd.DataFrame(columns=["ticker", "date"])
     if posts.empty:
@@ -62,9 +64,9 @@ def aggregate(posts: pd.DataFrame, calendars: dict[str, tuple[str, str, pd.Datet
     df = pd.concat(parts, ignore_index=True)
 
     scored = df["text"].map(score_text)
-    df["sent"] = [s for s, _ in scored]
+    df["sent"] = df[score_col] if score_col and score_col in df else [s for s, _ in scored]
     df["hits"] = [h for _, h in scored]
-    df["hit"] = (df["hits"] > 0).astype(float)
+    df["hit"] = (df["sent"] != 0).astype(float)
     df["w"] = engagement_weight(df)
     df["ws"] = df["w"] * df["sent"]
     df["pos"] = (df["sent"] > 0).astype(float)

@@ -32,6 +32,12 @@ Social data is the bottleneck: 30 days gives only ~20 trading sessions. News was
 4. **Cross-sectional models did not rescue it.** Technical-only models showed 11-day rank IC ~0.24–0.32, but that is price momentum on 11 days, not sentiment, and not stable.
 5. **Late-session sentiment** (last 2 hours before close) had 14 usable days and was negative after costs.
 6. **Five years of price-only cross-sectional reversal/momentum** also failed: gross long/short returns were ~0.03–0.21%/day, and 25 bps daily rebalancing costs made every variant negative (`research/price_edge.py`).
+7. **Transformer sentiment + 15-asset panel** (the next escalation): added LG Energy Solution, Samsung SDI, POSCO Holdings, KB Financial and Celltrion (7,103 more Naver posts, ~$0.13), scored 18,506 posts with KR-FinBERT/FinBERT, and tested logistic/RF/HGB classifiers plus a rank ensemble. Panel: 22 sessions, 211 rows, 14 assets.
+   - Raw transformer sentiment (k=2): **+0.23%/day net**, Sharpe 1.35, bootstrap 95% CI **[-0.97%, +1.50%]** — still includes zero.
+   - `social_pos_share` (k=2): +0.69%/day net, Sharpe 3.47, CI **[-0.65%, +2.21%]** — includes zero.
+   - Regression models: negative net and rank IC.
+   - Classifiers: AUC **0.40–0.49** (worse than random); ensemble net **-0.86%/day**.
+   - Conclusion: transformers and more cross-sectional assets did not create a reliable edge.
 
 ## Conclusion
 
@@ -46,11 +52,19 @@ This is a valid research outcome, not a failed pipeline. The project's contribut
 
 ## What would change the answer
 
-1. **60+ social sessions** (requires more Apify history; current free-tier budget cannot buy it).
-2. **Better sentiment extraction**: FinBERT/KR-FinBERT or an LLM scorer; the lexicon marks ~50% of Naver posts neutral.
-3. **More cross-sectional breadth**: 15–20 assets, not 10.
+1. **60+ social sessions.** A single 30-day run gives ~20 sessions. A 90-day Naver backfill costs roughly **$2.8**; remaining free-tier credit is **~$1.08**, leaving a **~$1.7 shortfall**. Without more credit (or permission to backfill via the public Naver API for research only), the sample cannot reach the 60-session threshold.
+2. **Better sentiment extraction**: FinBERT/KR-FinBERT were tested and did not fix it; the next step would be a domain-tuned multilingual model or an LLM scorer with a labeled evaluation set.
+3. **More cross-sectional breadth**: 15 assets were tested; still 19 usable test days.
 4. **Event features**: extreme sentiment, post velocity, author credibility.
 5. **Execution realism**: borrow costs, slippage, liquidity, short availability.
+
+## Exact blocker
+
+- Apify used: **$3.92 / $5.00**; remaining **~$1.08**.
+- Social panel: **22 sessions, 211 rows, 14 assets** after adding 5 Korean names.
+- To get **60+ social sessions**, need ~90 days of Naver history: ~**$2.8**, shortfall ~**$1.7**.
+- Or allow a **research-only direct Naver API backfill** (free, but deviates from the brief's Apify-only scraping requirement; production pipeline would still use Apify).
+- News (365 days) and price (5 years) were tested and have no edge after costs, so more of those does not help.
 
 ## Reproduce
 
@@ -58,6 +72,11 @@ This is a valid research outcome, not a failed pipeline. The project's contribut
 PYTHONPATH=. .venv/bin/python research/edge_lab.py
 PYTHONPATH=. .venv/bin/python research/validate_candidate.py
 PYTHONPATH=. .venv/bin/python research/news_edge.py
+PYTHONPATH=. .venv/bin/python research/price_edge.py
+PYTHONPATH=. .venv/bin/python research/transformer_edge.py
+
+# transformer scoring (optional; install torch/transformers first):
+PYTHONPATH=. .venv/bin/python research/transformer_sentiment.py
 
 # 365-day free news fetch (Exa credits, no Apify):
 PYTHONPATH=. .venv/bin/python research/fetch_news_history.py
