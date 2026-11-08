@@ -150,7 +150,7 @@ Keys are read from the environment or `.env`. Never commit `.env`. `data/` (raw 
 
 ## Results snapshot — 30-day run (2026-11-08)
 
-Live run: **11,403 social posts** (Naver 11,356 across all five KRX tickers, Telegram 31, LIHKG 16) and **197 Exa news items** across 10 assets, spanning 30 days. The current-sentiment tables use the last 10 days; the model trains on the full 30-day panel.
+Live run: **11,403 social posts** (Naver 11,356 across all five KRX tickers, Telegram 31, LIHKG 16) and **197 Exa news items** across 10 assets, spanning 30 days. The current-sentiment tables use the last 10 days; the model trains on the full 30-day panel. All social/news data in the submission comes from Apify and Exa; no direct-Naver or 365-day research data is used.
 
 - Long walk-forward over 1,685 pooled rows: naive baseline MAPE **2.656%**; price-only Ridge **2.673%** (direction 52.4%); price+sentiment Ridge **2.806%**. This is the 1-year price test; sentiment is only available for the last 30 days, so the fair sentiment comparison is the panel below.
 - **LODO diagnostic on the 30-day panel** (20 sessions x 10 tickers = 190 rows, pooled leave-one-session-out; both rows use the same PLS model class):
