@@ -57,23 +57,29 @@ Social data is public; the repo does not publish raw posts or usernames. The liv
 - Short sentiment model: pooled leave-one-session-out over sentiment-covered sessions; nested model/alpha selection as a sensitivity check.
 - Metrics: MAE, RMSE, MAPE, direction accuracy, skill vs naive. See `reports/live/model_metrics.csv`, `reports/live/short_history_metrics.csv`, and `reports/live/sentiment_nested_metrics.csv` for the latest pipeline run.
 
-## Metrics snapshot — 30-day run (2026-11-08)
+## Metrics snapshot — 30-day Apify + Exa run (2026-11-08)
 
 The 30-day run is the current evidence. A previous 10-day snapshot showed 73% direction; the larger sample showed that was small-sample noise.
 
-- Long walk-forward, 1,685 rows: naive **2.656%** MAPE, price model **2.673%**, price+sentiment **2.806%**.
-- Short sentiment panel, 190 rows / 20 sessions: naive **2.707%**, price-only **2.898%**, sentiment model **2.750%** (46.8% direction, -1.6% skill); nested selection **2.801%** (43.1%). Session-clustered bootstrap intervals overlap the naive baseline.
-- **Conclusion:** no reliable next-day price edge from the sentiment features in this period. The pipeline's value is the reproducible ingestion, alignment, and honest validation, not a claimed alpha.
+- Long walk-forward, 1,685 rows: naive **2.656%** MAPE, price-only **2.673%**, price+sentiment **2.806%**. Sentiment only exists for the last 30 days, so this is not the fair sentiment test.
+- **Ablation on the 30-day panel, 190 rows / 20 sessions:**
+
+| Model | MAPE | Direction |
+|---|---:|---:|
+| Naive | **2.707%** | — |
+| Price-only Ridge | 2.898% | 48.9% |
+| **Price+sentiment Ridge** | **2.750%** | 46.8% |
+
+Sentiment improves MAPE versus price-only by **0.148 pp**, but the full model does not beat naive; bootstrap intervals overlap the baseline. The deliverable is the price+sentiment model; price-only is the control.
 
 ## Limitations
 
-- The current-sentiment window (`social_days`, 10 days) is separate from the 30-day training window; a single 30-day run gives ~20 sessions, still below the 60-session warm-up.
+- The current-sentiment window (`social_days`, 10 days) is separate from the 30-day training window; a single 30-day Apify run gives ~20 sessions, still below the 60-session warm-up.
 - Lexicon sentiment handles simple negation but not sarcasm or all Korean/Cantonese slang; ~50% of Naver posts score neutral.
 - Naver is sampled, not exhaustive.
 - Exchange holidays are not explicitly modeled.
 - Market context features were tested but omitted because they worsened out-of-sample MAPE; they remain in the dataset for experiments.
 - The product/business claims of the company are unrelated to this model's validity.
-- An extended edge audit (30-day social, 365-day news, 5-year prices, 15-asset transformer panel, 365-day direct Naver backfill, classification/ensembles, holding periods, costs, bootstrap) found **no reliable edge**. The 180-day long-only near-miss (+0.35%/day) did not replicate on 365 days (+0.11%/day, 95% CI [-0.13%, +0.34%]). See `reports/research/README.md`.
 
 ## Ethical / regulatory
 

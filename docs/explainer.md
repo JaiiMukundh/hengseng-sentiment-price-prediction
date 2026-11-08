@@ -15,7 +15,7 @@ This project does the same for prices:
 - The model = a rule that combines sentiment with price behaviour.
 - Validation = replaying history day by day, without peeking at the future, and comparing against "tomorrow will be like today".
 
-The honest result: on the 30-day panel the sentiment model does **not** beat the naive baseline (2.75% vs 2.71% MAPE, 46.8% direction). The earlier 10-day result looked strong but did not survive a larger sample. This is a research pipeline, not a proven money machine.
+The honest result: on the 30-day Apify+Exa panel the price+sentiment model improves MAPE versus price-only (**2.750% vs 2.898%**), but the full model does not beat the naive baseline (2.707%). This is a research pipeline, not a proven money machine.
 
 ## The five stages
 

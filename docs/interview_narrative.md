@@ -11,7 +11,7 @@
 3. **Normalization**: one schema, UTC timestamps, URL-safe ticker matching, deduplication.
 4. **Alignment**: a post belongs to `(previous close, this close]`; after-close and weekend posts roll forward.
 5. **Modeling**: price technicals + sentiment; long walk-forward for the price model; pooled leave-one-session-out for the sentiment panel; nested model selection; bootstrap intervals.
-6. **Result**: on the 30-day panel (20 sessions, 190 rows), sentiment model 2.75% MAPE vs 2.71% naive and 46.8% direction; the earlier 10-day 73% direction did not survive the larger sample. The honest conclusion is no reliable next-day edge, and the bootstrap intervals overlap the baseline.
+6. **Result**: on the 30-day Apify+Exa panel (20 sessions, 190 rows), price-only 2.898% MAPE vs price+sentiment **2.750%** — sentiment improves the price model by 0.148 pp, but the full model still does not beat the naive baseline (2.707%). The honest conclusion is a small feature gain, not a trading edge.
 7. **Engineering**: cached raw data, per-source cost caps, retries, partial-run recovery, tests, CI, Docker, docs.
 
 ## Role fit
@@ -29,7 +29,7 @@
 
 - Built a Python alternative-data pipeline that ingests Apify social feeds and Exa news for 10 HK/KR equities, normalizes to UTC, and aligns posts to exchange sessions without look-ahead.
 - Engineered price, sentiment and market features; validated next-session forecasts with walk-forward, pooled leave-one-session-out, nested model selection and session-clustered bootstrap intervals.
-- Reached 2.75% MAPE vs 2.71% naive on a 30-day sentiment panel, with 46.8% direction; documented that the earlier 10-day 73% direction was small-sample noise and that no reliable edge survived the larger sample.
+- Reached 2.750% MAPE vs 2.898% price-only on the 30-day Apify+Exa panel, a small sentiment-feature gain, while documenting that the full model does not beat the naive baseline (2.707%).
 - Shipped a reproducible CLI, cached raw datasets, per-source cost caps, 78 tests, GitHub Actions CI, Dockerfile and a self-contained HTML report.
 
 ## Likely interview questions

@@ -12,4 +12,3 @@ reports/*
 !reports/demo/
 .DS_Store
 !reports/live/
-!reports/research/

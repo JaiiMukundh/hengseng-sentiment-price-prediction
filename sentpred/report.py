@@ -65,12 +65,12 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
             "news_items": len(news_t),
             "sentiment": round(sent, 3),
             "direction": direction(sent, threshold),
-            "pred_close_n1": round(float(fc["pred_price"].iloc[0]), 4) if len(fc) else None,
-            "pred_move_pct": round(float(fc["pred_ret"].iloc[0]) * 100, 2) if len(fc) else None,
-            "signal": fc["signal"].iloc[0] if len(fc) else None,
-            "pred_sent_close_n1": round(float(fc["pred_sent_price"].iloc[0]), 4) if len(fc) and "pred_sent_price" in fc else None,
-            "pred_sent_move_pct": round(float(fc["pred_sent_ret"].iloc[0]) * 100, 2) if len(fc) and "pred_sent_ret" in fc else None,
-            "sent_signal": _signal(fc["pred_sent_ret"].iloc[0], cfg.raw["model"]["signal_threshold"]) if len(fc) and "pred_sent_ret" in fc else None,
+            "model_close_n1": round(float(fc["pred_sent_price"].iloc[0]), 4) if len(fc) and "pred_sent_price" in fc else None,
+            "model_move_pct": round(float(fc["pred_sent_ret"].iloc[0]) * 100, 2) if len(fc) and "pred_sent_ret" in fc else None,
+            "model_signal": _signal(fc["pred_sent_ret"].iloc[0], cfg.raw["model"]["signal_threshold"]) if len(fc) and "pred_sent_ret" in fc else None,
+            "price_only_close_n1": round(float(fc["pred_price"].iloc[0]), 4) if len(fc) else None,
+            "price_only_move_pct": round(float(fc["pred_ret"].iloc[0]) * 100, 2) if len(fc) else None,
+            "price_only_signal": fc["signal"].iloc[0] if len(fc) else None,
             "position": asset.position_label,
             "support": ", ".join(f"{s['level']:.2f}" for s in lv["support"]) or "-",
             "resistance": ", ".join(f"{r['level']:.2f}" for r in lv["resistance"]) or "-",
@@ -151,6 +151,13 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
             f"{_table(coefficients.round(4))}"
         )
     banner_html = f"<div class='banner'>{html.escape(banner)}</div>" if banner else ""
+    forecast_view = forecasts.rename(columns={
+        "pred_ret": "price_only_pred_ret",
+        "pred_price": "price_only_pred_price",
+        "pred_sent_ret": "model_pred_ret",
+        "pred_sent_price": "model_pred_price",
+        "model_used": "price_model_used",
+    })
     doc = _HTML.format(
         banner=banner_html,
         sections="".join(sections),
@@ -158,8 +165,8 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
         short=short_html,
         check=_table(check),
         mae=_img(mae_png),
-        forecast=_table(forecasts.round({"close": 4, "pred_ret": 4, "pred_price": 4,
-                                         "pred_sent_ret": 4, "pred_sent_price": 4})),
+        forecast=_table(forecast_view.round({"close": 4, "price_only_pred_ret": 4, "price_only_pred_price": 4,
+                                             "model_pred_ret": 4, "model_pred_price": 4})),
         generated=pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
     )
     path = out_dir / "index.html"
