@@ -48,7 +48,7 @@ Social data is public; the repo does not publish raw posts or usernames. The liv
 
 - Long walk-forward: `naive` (no change), `ridge_price` (technicals only), and `ridge_sent` (technicals + sentiment). Ridge is used because the 1-year sample is small.
 - Short-history sentiment panel (used when sentiment sessions are below `min_train_dates`): pooled leave-one-session-out panel with a **6-component PLS** model over the engineered feature set above. The control is the same PLS on price technicals only, so the ablation isolates the sentiment features. Predictions are shrunk **0.30** toward zero and clipped at ±5%.
-- A small MLP (4–16 hidden units, LBFGS/Adam, early stopping), a deep MLP, Random Forest, gradient boosting, nearest neighbours and Ridge+MLP blends were tested in `experiments/`. The MLP and ensemble results were seed-sensitive and less stable than PLS; Ridge remains the linear reference for coefficients.
+- A small MLP (4–16 hidden units, LBFGS/Adam, early stopping), a deep MLP, Random Forest, gradient boosting, nearest neighbours, an RBF SVR and Ridge+MLP/PLS+SVR blends were tested in `experiments/`. The MLP and Ridge+MLP results were seed-sensitive; the RBF SVR was positive but below PLS (2.681% / 2.725%). The PLS+SVR blend moved LODO by ~0.003 pp, which is noise, so it was not shipped. Ridge remains the linear reference for coefficients.
 - Nested selection of the model family and alpha inside each training fold is reported as a sensitivity check.
 
 ## Validation

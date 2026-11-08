@@ -120,7 +120,11 @@ def make_model(name: str, params: dict, columns: list[str]):
     if name == "knn":
         return make_pipeline(pre, KNeighborsRegressor(n_neighbors=params.get("k", 5), weights="distance"))
     if name == "svr":
-        return make_pipeline(pre, SVR(C=params.get("c", 1.0), epsilon=0.01, gamma="scale"))
+        return make_pipeline(pre, SVR(
+            C=params.get("c", params.get("C", 1.0)),
+            epsilon=params.get("epsilon", 0.01),
+            gamma=params.get("gamma", "scale"),
+            kernel=params.get("kernel", "rbf")))
     if name == "pls":
         return make_pipeline(pre, PLSRegression(n_components=params.get("components", 3)))
     raise ValueError(name)

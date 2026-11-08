@@ -65,6 +65,8 @@ def main():
          {"components": 6, "scale": 1.0}, 0.30, 0.05),
         ("final_engineered_ridge", ENGINEERED_MODEL_FEATURES, "ridge",
          {"alpha": 10, "scale": 8.0}, 0.40, 0.05),
+        ("svr_engineered", ENGINEERED_MODEL_FEATURES, "svr",
+         {"c": 10.0, "epsilon": 0.002, "gamma": "scale", "scale": 4.0}, 0.20, 0.05),
         ("engineered_scale4", ENGINEERED_MODEL_FEATURES, "ridge", {"alpha": 10, "scale": 4.0}, 0.40, 0.05),
         ("engineered_scale1", ENGINEERED_MODEL_FEATURES, "ridge", {"alpha": 10, "scale": 1.0}, 0.40, 0.05),
         ("engineered_no_clip", ENGINEERED_MODEL_FEATURES, "ridge", {"alpha": 10, "scale": 8.0}, 0.40, None),
