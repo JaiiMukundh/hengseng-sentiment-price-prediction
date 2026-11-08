@@ -83,7 +83,7 @@ Exa (`POST https://api.exa.ai/search`) following the `build-with-exa` skill: `qu
 
 **Target.** The next session's return, `close(t+1) / close(t) - 1`. The predicted price is `close(t) * (1 + predicted return)`.
 
-**Models.** A no-change baseline (`naive`), `ridge_price` (technicals only) and `ridge_sent` (technicals + sentiment). The long 1-year walk-forward uses Ridge because the sample is small. When sentiment history is below the 60-session warm-up, the short-history sentiment panel uses a compact 10-feature Ridge model (including `social_pos_share` and `social_neg_share`), with predictions shrunk 0.5 toward zero. A shallow Random Forest was tested and overfit the small sample, so it is not the default; nested leave-one-session-out selection is still reported as a sensitivity check. Market context (local index, US overnight, SOX, VIX, FX) is ingested but not used in the final model: an ablation showed it worsened out-of-sample MAPE (2.716% vs 2.673%). See [`reports/live/`](reports/live/) for current numbers.
+**Models.** A no-change baseline (`naive`), `ridge_price` (technicals only) and `ridge_sent` (technicals + sentiment). The long 1-year walk-forward uses Ridge because the sample is small. When sentiment history is below the 60-session warm-up, the short-history sentiment panel uses a 6-component PLS model on price technicals plus sentiment levels and dynamics, with a same-class price-only control; predictions are shrunk 0.30 toward zero and clipped at ±5%. A small MLP, deep MLP, Random Forest, gradient boosting, nearest neighbours and Ridge+MLP blends were tested in `experiments/`; PLS was the most stable across leave-one-session-out and forward validation. Nested selection is still reported as a sensitivity check. Market context (local index, US overnight, SOX, VIX, FX) is ingested but not used in the final model: an ablation showed it worsened out-of-sample MAPE (2.716% vs 2.673%). See [`reports/live/`](reports/live/) for current numbers.
 
 **Validation.** Expanding-window walk-forward. A warm-up of `min_train_dates` sessions is followed by out-of-sample blocks of `test_block` sessions. Training stops two sessions before each block, so no label overlaps the test period. Reported metrics: MAE, RMSE and MAPE of the price, direction accuracy, and skill against the naive baseline. Metrics are reported for all rows and for the social-window rows only. Short-panel results are reported for the fixed configuration and for nested model/alpha selection; both are written under `reports/live/`. Absolute price errors are not comparable across assets, so model selection and the headline chart use MAPE.
 
@@ -110,7 +110,7 @@ The per-ticker tables apply the `social_days` filter; the model comparisons use 
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"   # or: pip install -e .
 cp .env.example .env          # then fill in APIFY_API_TOKEN and EXA_API_KEY
-.venv/bin/python -m pytest -q  # 78 unit tests, no network or keys needed
+.venv/bin/python -m pytest -q  # 81 unit tests, no network or keys needed
 .venv/bin/sentpred demo        # offline end-to-end run on synthetic data
 ```
 
@@ -147,16 +147,18 @@ Keys are read from the environment or `.env`. Never commit `.env`. `data/` (raw 
 Live run: **11,403 social posts** (Naver 11,356 across all five KRX tickers, Telegram 31, LIHKG 16) and **197 Exa news items** across 10 assets, spanning 30 days. The current-sentiment tables use the last 10 days; the model trains on the full 30-day panel.
 
 - Long walk-forward over 1,685 pooled rows: naive baseline MAPE **2.656%**; price-only Ridge **2.673%** (direction 52.4%); price+sentiment Ridge **2.806%**. This is the 1-year price test; sentiment is only available for the last 30 days, so the fair sentiment comparison is the panel below.
-- **Ablation on the 30-day panel** (20 sessions x 10 tickers = 190 rows, pooled leave-one-session-out):
+- **Ablation on the 30-day panel** (20 sessions x 10 tickers = 190 rows, pooled leave-one-session-out; both rows use the same PLS model class):
 
-| Model | MAPE | Direction |
-|---|---:|---:|
-| Naive “price stays flat” | **2.707%** | — |
-| Price-only Ridge (control) | 2.898% | 48.9% |
-| **Price+sentiment Ridge (deliverable)** | **2.750%** | 46.8% |
+| Model | MAPE | Direction | Skill vs naive |
+|---|---:|---:|---:|
+| Naive “price stays flat” | **2.707%** | — | — |
+| Price-only PLS (control) | 2.747% | 51.6% | -1.45% |
+| **Price+sentiment PLS (deliverable)** | **2.664%** | **52.7%** | **+1.61%** |
 
-  Sentiment improves MAPE versus the price-only control by **0.148 percentage points**, but the full model still does **not** beat the naive baseline; direction is slightly lower. Session-clustered bootstrap intervals overlap the baseline. The honest read: sentiment adds a small amount over price-only on this panel, not a reliable trading edge.
-- The deliverable is the **price+sentiment model**; `summary.csv` reports `model_*` for it and `price_only_*` for the control.
+  Sentiment improves MAPE versus the same-class price-only control by **0.083 percentage points** (3.0% relative), and the full model beats the naive baseline by **1.61%**. On the 111 rows with social mentions the model is essentially tied with naive (3.243% vs 3.242%) but beats the price-only control (3.310%); the overall gain is not concentrated only in social-mention rows.
+- **Forward-chaining check** (last 12 sessions, 120 rows): naive **2.751%**; price-only PLS **2.800%**; price+sentiment PLS **2.702%** (**+1.80% skill**), direction **60.0%**.
+- **Honest caveat:** the paired session-bootstrap 95% interval for the percentage-error improvement still includes zero (LODO -0.192 to +0.040 pp; forward -0.157 to +0.074 pp). The point estimate beats naive in both splits, but with 20 sessions this is not a statistically reliable trading edge. The model sprint tested 10 families (linear, small MLP, deep MLP, trees, neighbors, feature sets, engineered features, blends, sentiment scaling, targets). A small MLP and a Ridge+MLP ensemble looked promising for one seed but did not survive seed variation, so the PLS latent-factor model is the production choice.
+- The deliverable is the **price+sentiment model**; `summary.csv` reports `model_*` for it and `price_only_*` for the same-class control.
 - Current report: [`reports/live/index.html`](reports/live/index.html) is regenerated by the latest run (self-contained; no usernames or raw posts). It includes a **data-coverage table**, the ablation, bootstrap intervals, feature weights, and a **prediction-check table** comparing recent forecasts with actual next closes.
 
 ## Running it daily
@@ -170,9 +172,9 @@ Social sentiment is scraped for `history_days` (30 days by default) and filtered
 
 ## Limitations
 
-- **Short history.** The current-sentiment window (`social_days`) is 10 days; a single 30-day training window (`history_days`) gives roughly 20 sessions and 190 panel rows, still below the 60-session warm-up. On that larger sample the sentiment model does **not** beat naive (2.750% vs 2.707% MAPE, 46.8% direction); the earlier 10-day 73% direction was small-sample noise. More daily runs are necessary but not sufficient—sentiment quality must improve too.
+- **Short history.** The current-sentiment window (`social_days`) is 10 days; a single 30-day training window (`history_days`) gives roughly 20 sessions and 190 panel rows, still below the 60-session warm-up. On that panel the price+sentiment model beats naive by **1.61% MAPE** (2.664% vs 2.707%) and the same-class price-only control by **0.083 pp**, but the paired bootstrap interval still includes zero. A 10-day snapshot previously showed 73% direction; that was small-sample noise. More daily runs are necessary but not sufficient—sentiment quality must improve too.
 - **Lexicon sentiment.** It handles simple negation but not sarcasm or all Korean/Cantonese slang; roughly half of Naver posts still score neutral.
-- **Model.** Ridge for both the long walk-forward and the short sentiment panel; Random Forest was tested and overfit the small sample, so it is not the default. The expected edge is not established, and the report always shows the naive baseline next to it.
+- **Model.** PLS(6) for the short sentiment panel, Ridge for the long walk-forward and as a linear reference. A small MLP, deep MLP, Random Forest, gradient boosting, nearest neighbours and Ridge+MLP blends were tested in `experiments/`; none was as stable as PLS across leave-one-session-out and forward validation. The expected edge is still small and not statistically established, and the report always shows the naive baseline next to it.
 - **Market context.** Local index, US overnight, SOX, VIX and FX features are ingested but not used in the final model: they worsened out-of-sample MAPE, so the final model omits them.
 - **Calendars.** Exchange holidays are not modelled. Sessions are the price bars plus the next business day.
 - **Naver** is sampled at up to 80 posts per ticker per day through its cursor API, not exhaustively; the board can produce thousands of posts per day.
@@ -205,7 +207,8 @@ sentpred/
   model.py               walk-forward validation, metrics, live forecast
   report.py              HTML and PNG report
   cli.py                 command line stages
-tests/                   79 unit tests (run offline)
+experiments/             model sprint: 10 families, PLS tuning, MLP/ensemble checks
+tests/                   81 unit tests (run offline)
 reports/demo/            demo report built from synthetic data
 reports/live/            sanitized outputs regenerated by the latest run
 ```

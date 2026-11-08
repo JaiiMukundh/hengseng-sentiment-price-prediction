@@ -20,6 +20,19 @@ SENTIMENT_MODEL_FEATURES = [
     "social_sent_wmean", "social_pos_share", "social_neg_share",
     "news_sent_wmean", "social_n_log", "has_social",
 ]
+# Sentiment dynamics let the model distinguish "already priced in" from "changing now".
+SENTIMENT_DYNAMICS = ["sent_chg", "sent_ma3", "sent_z", "mention_chg", "news_chg", "news_social_div"]
+# Winning short-history design from the model sprint: price technicals + sentiment level + dynamics.
+ENGINEERED_MODEL_FEATURES = PRICE_FEATURES + [
+    "social_sent_wmean", "social_pos_share", "social_neg_share", "news_sent_wmean",
+    "social_n_log", "has_social", *SENTIMENT_DYNAMICS,
+]
+# Only these get the post-standardization importance multiplier; dynamics keep a natural scale.
+SENTIMENT_SCORE_FEATURES = {
+    "social_sent_mean", "social_sent_wmean", "social_pos_share", "social_neg_share",
+    "news_sent_mean", "news_sent_wmean", "social_sent_mean_hit", "social_sent_wmean_hit",
+    "news_sent_mean_hit", "news_sent_wmean_hit",
+}
 _AGG_COLUMNS = ["n", "sent_mean", "sent_wmean", "pos_share", "neg_share", "eng_log",
                 "hit_share", "sent_mean_hit", "sent_wmean_hit"]
 
@@ -132,6 +145,38 @@ def _append_pending_sessions(df: pd.DataFrame, social: pd.DataFrame, news: pd.Da
     return df
 
 
+def add_sentiment_dynamics(df: pd.DataFrame) -> pd.DataFrame:
+    """Per-ticker sentiment momentum, z-score and cross-source divergence.
+
+    Dynamics are computed on sessions with social/news coverage, which is the panel the
+    short-history model is fitted on. A ticker with no post on a covered session keeps a
+    zero sentiment value, so the change still reflects the disappearance of mentions.
+    Computed after pending-session rows are appended, so the latest row sees the most
+    recent posts without using any future session's price or sentiment.
+    """
+    out = df.sort_values(["ticker", "date"]).copy()
+    for column in SENTIMENT_DYNAMICS:
+        out[column] = 0.0
+    covered_dates = out.loc[(out["has_social"] + out["has_news"]) > 0, "date"].unique()
+    covered = out["date"].isin(covered_dates)
+    if not covered.any():
+        return out
+
+    base = out.loc[covered].copy()
+    g = base.groupby("ticker", sort=False)
+    base["sent_chg"] = g["social_sent_wmean"].diff().fillna(0.0)
+    base["sent_ma3"] = g["social_sent_wmean"].transform(lambda s: s.rolling(3, min_periods=1).mean())
+    roll = g["social_sent_wmean"].transform(lambda s: s.rolling(10, min_periods=3).mean())
+    std = g["social_sent_wmean"].transform(lambda s: s.rolling(10, min_periods=3).std()).replace(0, np.nan)
+    base["sent_z"] = ((base["social_sent_wmean"] - roll) / std).fillna(0.0)
+    base["mention_chg"] = g["social_n_log"].diff().fillna(0.0)
+    base["news_chg"] = g["news_sent_wmean"].diff().fillna(0.0)
+    base["news_social_div"] = base["news_sent_wmean"] - base["social_sent_wmean"]
+    for column in SENTIMENT_DYNAMICS:
+        out.loc[base.index, column] = base[column].to_numpy()
+    return out
+
+
 def build_dataset(prices: pd.DataFrame, social: pd.DataFrame, news: pd.DataFrame,
                   market: pd.DataFrame | None = None) -> pd.DataFrame:
     df = price_features(prices)
@@ -147,4 +192,4 @@ def build_dataset(prices: pd.DataFrame, social: pd.DataFrame, news: pd.DataFrame
             df[col] = df[col].fillna(0.0)
         df[f"has_{prefix}"] = (df[f"{prefix}_n"] > 0).astype(float)
         df[f"{prefix}_n_log"] = np.log1p(df[f"{prefix}_n"])
-    return _append_pending_sessions(df, social, news)
+    return add_sentiment_dynamics(_append_pending_sessions(df, social, news))

@@ -174,20 +174,37 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     bootstrap = None
     if sent_sessions < mcfg["min_train_dates"]:
         sent_alpha = mcfg.get("sentiment_alpha", 50)
-        sent_shrink = mcfg.get("sentiment_shrinkage", 0.5)
-        sent_model = mcfg.get("sentiment_model", "rf")
+        sent_shrink = mcfg.get("sentiment_shrinkage", 0.3)
+        sent_model = mcfg.get("sentiment_model", "pls")
+        sent_scale = mcfg.get("sentiment_scale", 1.0)
+        sent_clip = mcfg.get("sentiment_clip")
+        sent_components = mcfg.get("sentiment_components", 6)
         short_preds, short_dates = model.leave_one_session_out(
-            dataset, sent_alpha, sent_shrink, sent_model)
+            dataset, sent_alpha, sent_shrink, sent_model, sent_scale, sent_clip, sent_components)
         short_metrics = model.evaluate(short_preds)
         bootstrap = evaluation.cluster_bootstrap(short_preds)
-        nested = model.nested_sentiment_predictions(dataset, shrink=sent_shrink)
+        nested = model.nested_sentiment_predictions(
+            dataset, shrink=sent_shrink, scale=sent_scale, clip=sent_clip, components=sent_components)
         nested = nested.merge(short_preds[["date", "ticker", "pred_ridge_price"]], on=["date", "ticker"], how="left")
         nested["pred_naive"] = 0.0
         nested_metrics = model.evaluate(nested.dropna(subset=["pred_ridge_price", "pred_ridge_sent"]))
-        coefficients = model.sentiment_coefficients(dataset, sent_alpha)
-        importances = model.sentiment_importances(dataset, sent_model, sent_alpha)
+        coefficients = model.sentiment_coefficients(dataset, sent_alpha, sent_scale)
+        importances = model.sentiment_importances(
+            dataset, sent_model, sent_alpha, sent_scale, sent_components)
         forecasts = forecasts.merge(
-            model.sentiment_forecast(dataset, sent_alpha, sent_shrink, sent_model), on="ticker", how="left")
+            model.sentiment_forecast(dataset, sent_alpha, sent_shrink, sent_model,
+                                     sent_scale, sent_clip, sent_components),
+            on="ticker", how="left")
+        price_only = model.price_only_forecast(
+            dataset, sent_alpha, sent_shrink, sent_model, sent_clip, sent_components)
+        forecasts = forecasts.merge(price_only, on="ticker", how="left")
+        forecasts["pred_ret"] = forecasts["pred_price_only_ret"]
+        forecasts["pred_price"] = forecasts["pred_price_only_price"]
+        forecasts["signal"] = np.select(
+            [forecasts["pred_ret"] > mcfg["signal_threshold"],
+             forecasts["pred_ret"] < -mcfg["signal_threshold"]],
+            ["LONG", "SHORT"], "FLAT")
+        forecasts["model_used"] = f"{sent_model}_price_only"
         short_metrics.to_csv(paths.processed / "short_history_metrics.csv", index=False)
         bootstrap.to_csv(paths.processed / "short_history_bootstrap.csv", index=False)
         nested_metrics.to_csv(paths.processed / "sentiment_nested_metrics.csv", index=False)
@@ -212,7 +229,7 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     preds.to_csv(paths.processed / "walk_forward_predictions.csv", index=False)
     metrics.to_csv(paths.processed / "model_metrics.csv", index=False)
     forecasts.to_csv(paths.processed / "forecasts.csv", index=False)
-    log.info("model: %d out-of-sample rows; best model for forecast: %s",
+    log.info("model: %d out-of-sample rows; next-session price-only control: %s",
              len(preds), forecasts["model_used"].iloc[0] if len(forecasts) else "n/a")
     return {"prices": prices, "posts": posts, "news": news, "forecasts": forecasts,
             "levels": lvl, "metrics": metrics, "preds": preds, "sent_sessions": sent_sessions,

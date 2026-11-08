@@ -104,8 +104,11 @@ model:
   min_train_dates: 60        # walk-forward warm-up, in trading sessions
   test_block: 5              # sessions per out-of-sample block
   ridge_alpha: 1.0
-  sentiment_alpha: 10.0    # stronger shrinkage for the short-history sentiment panel
-  sentiment_model: ridge   # ridge = stable linear model; rf available for comparison
-  sentiment_shrinkage: 0.5 # calibrate noisy forecasts toward zero
+  sentiment_alpha: 10.0    # Ridge reference / nested candidate
+  sentiment_model: pls     # pls = latent-factor model; ridge/rf kept for comparison
+  sentiment_components: 6  # PLS components chosen on both LODO and forward validation
+  sentiment_shrinkage: 0.30 # calibrate noisy forecasts toward zero
+  sentiment_scale: 1.0     # post-standardization sentiment multiplier (PLS learns its own weights)
+  sentiment_clip: 0.05     # cap a single next-session return forecast at +/-5%
   signal_threshold: 0.005    # |predicted return| above this -> LONG / SHORT, otherwise FLAT
   sentiment_direction: 0.1   # |sentiment score| above this -> BULLISH / BEARISH

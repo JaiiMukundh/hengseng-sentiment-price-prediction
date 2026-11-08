@@ -38,7 +38,7 @@ Social data is public; the repo does not publish raw posts or usernames. The liv
 - Social: log post count, mean and engagement-weighted sentiment, positive/negative shares, engagement, coverage flags.
 - News: log count, mean and weighted sentiment, coverage flags.
 - Market (ingested, not used in the final model): local index, US overnight, SOX, VIX, FX. Tested and omitted because it worsened out-of-sample MAPE in the previous 10-day snapshot.
-- Short sentiment model: compact 10-feature set: `ret_1`, `ret_5`, `vol_10`, `rsi_14`, `social_sent_wmean`, `social_pos_share`, `social_neg_share`, `news_sent_wmean`, `social_n_log`, `has_social`.
+- Short sentiment model: 19 engineered features — the seven price technicals plus `social_sent_wmean`, `social_pos_share`, `social_neg_share`, `news_sent_wmean`, `social_n_log`, `has_social`, and six sentiment-dynamics features: `sent_chg`, `sent_ma3`, `sent_z`, `mention_chg`, `news_chg`, `news_social_div`.
 
 ## Target
 
@@ -47,34 +47,39 @@ Social data is public; the repo does not publish raw posts or usernames. The liv
 ## Models
 
 - Long walk-forward: `naive` (no change), `ridge_price` (technicals only), and `ridge_sent` (technicals + sentiment). Ridge is used because the 1-year sample is small.
-- Short-history sentiment panel (used when sentiment sessions are below `min_train_dates`): pooled leave-one-session-out panel with a compact Ridge model over the feature set above. `social_pos_share` and `social_neg_share` are the sentiment-share features. A shallow Random Forest was tested and overfit; it is not the default.
-- Ridge remains a linear reference for coefficients.
-- Nested selection of the model family and alpha inside each training fold is reported as a sensitivity check; predictions are shrunk 0.5 toward zero.
+- Short-history sentiment panel (used when sentiment sessions are below `min_train_dates`): pooled leave-one-session-out panel with a **6-component PLS** model over the engineered feature set above. The control is the same PLS on price technicals only, so the ablation isolates the sentiment features. Predictions are shrunk **0.30** toward zero and clipped at ±5%.
+- A small MLP (4–16 hidden units, LBFGS/Adam, early stopping), a deep MLP, Random Forest, gradient boosting, nearest neighbours and Ridge+MLP blends were tested in `experiments/`. The MLP and ensemble results were seed-sensitive and less stable than PLS; Ridge remains the linear reference for coefficients.
+- Nested selection of the model family and alpha inside each training fold is reported as a sensitivity check.
 
 ## Validation
 
 - Long model: expanding-window walk-forward, 60-session warm-up, 5-session blocks, one-session purge.
-- Short sentiment model: pooled leave-one-session-out over sentiment-covered sessions; nested model/alpha selection as a sensitivity check.
-- Metrics: MAE, RMSE, MAPE, direction accuracy, skill vs naive. See `reports/live/model_metrics.csv`, `reports/live/short_history_metrics.csv`, and `reports/live/sentiment_nested_metrics.csv` for the latest pipeline run.
+- Short sentiment model: pooled leave-one-session-out over sentiment-covered sessions; same-class price-only control; nested model/alpha selection as a sensitivity check.
+- Secondary check: forward chaining on the last 12 sessions (120 rows), training only on sessions at least two dates earlier.
+- Metrics: MAE, RMSE, MAPE, direction accuracy, skill vs naive, and paired session-clustered bootstrap of the percentage-error improvement. See `reports/live/model_metrics.csv`, `reports/live/short_history_metrics.csv`, `reports/live/sentiment_nested_metrics.csv`, and `experiments/results/engineered_validation.csv`.
 
 ## Metrics snapshot — 30-day Apify + Exa run (2026-11-08)
 
 The 30-day run is the current evidence. A previous 10-day snapshot showed 73% direction; the larger sample showed that was small-sample noise.
 
 - Long walk-forward, 1,685 rows: naive **2.656%** MAPE, price-only **2.673%**, price+sentiment **2.806%**. Sentiment only exists for the last 30 days, so this is not the fair sentiment test.
-- **Ablation on the 30-day panel, 190 rows / 20 sessions:**
+- **Ablation on the 30-day panel, 190 rows / 20 sessions (same PLS model class):**
 
-| Model | MAPE | Direction |
-|---|---:|---:|
-| Naive | **2.707%** | — |
-| Price-only Ridge | 2.898% | 48.9% |
-| **Price+sentiment Ridge** | **2.750%** | 46.8% |
+| Model | MAPE | Direction | Skill vs naive |
+|---|---:|---:|---:|
+| Naive | **2.707%** | — | — |
+| Price-only PLS | 2.747% | 51.6% | -1.45% |
+| **Price+sentiment PLS** | **2.664%** | **52.7%** | **+1.61%** |
 
-Sentiment improves MAPE versus price-only by **0.148 pp**, but the full model does not beat naive; bootstrap intervals overlap the baseline. The deliverable is the price+sentiment model; price-only is the control.
+Sentiment improves MAPE versus the same-class price-only control by **0.083 pp** (3.0% relative), and the full model beats naive by **1.61%**. On the 111 social-mention rows the model is essentially tied with naive (3.243% vs 3.242%) but beats the price-only control (3.310%).
+
+- **Forward-chaining check, last 12 sessions / 120 rows:** naive **2.751%**, price-only PLS **2.800%**, price+sentiment PLS **2.702%** (**+1.80%**), direction **60.0%**.
+- **Caveat:** the paired session-bootstrap 95% interval for the percentage-error improvement still includes zero (LODO -0.192 to +0.040 pp; forward -0.157 to +0.074 pp). The point estimate beats naive in both splits, but with 20 sessions this is not a statistically reliable trading edge.
 
 ## Limitations
 
-- The current-sentiment window (`social_days`, 10 days) is separate from the 30-day training window; a single 30-day Apify run gives ~20 sessions, still below the 60-session warm-up.
+- The current-sentiment window (`social_days`, 10 days) is separate from the 30-day training window; a single 30-day Apify run gives ~20 sessions, still below the 60-session warm-up. The point estimate beats naive, but the paired bootstrap interval includes zero.
+- The 6-component PLS and the 0.30 shrinkage were selected after a model sprint; the forward check is encouraging but is not an independent holdout from all selection.
 - Lexicon sentiment handles simple negation but not sarcasm or all Korean/Cantonese slang; ~50% of Naver posts score neutral.
 - Naver is sampled, not exhaustive.
 - Exchange holidays are not explicitly modeled.

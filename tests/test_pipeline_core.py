@@ -4,7 +4,13 @@ import pytest
 
 from sentpred import align, levels, model
 from sentpred.config import Asset
-from sentpred.features import PRICE_FEATURES, build_dataset, rsi
+from sentpred.features import (
+    ENGINEERED_MODEL_FEATURES,
+    PRICE_FEATURES,
+    SENTIMENT_DYNAMICS,
+    build_dataset,
+    rsi,
+)
 
 
 def _prices(n_days=200, tickers=("0700.HK", "9988.HK"), seed=0):
@@ -119,8 +125,8 @@ def test_short_history_sentiment_model_trains_real_weights():
     assert not np.allclose(preds["pred_ridge_sent"], preds["pred_ridge_price"])
 
     coefficients = model.sentiment_coefficients(dataset, alpha=100.0)
-    assert len(coefficients) == len(model.SENTIMENT_MODEL_FEATURES)
-    sentiment_coefs = coefficients[coefficients["feature"].isin(model.SENTIMENT_MODEL_FEATURES)]
+    assert len(coefficients) == len(model.ENGINEERED_MODEL_FEATURES)
+    sentiment_coefs = coefficients[coefficients["feature"].isin(model.ENGINEERED_MODEL_FEATURES)]
     assert sentiment_coefs["coefficient"].abs().sum() > 0
 
     forecast = model.sentiment_forecast(dataset, alpha=50.0, shrink=0.5)
@@ -128,7 +134,7 @@ def test_short_history_sentiment_model_trains_real_weights():
     assert forecast["pred_sent_price"].notna().all()
 
     importances = model.sentiment_importances(dataset, "rf")
-    assert len(importances) == len(model.SENTIMENT_MODEL_FEATURES)
+    assert len(importances) == len(model.ENGINEERED_MODEL_FEATURES)
     assert importances["importance"].sum() == pytest.approx(1.0)
     assert (importances["importance"] >= 0).all()
 
@@ -141,8 +147,8 @@ def test_sentiment_importances_finite_and_normalized_for_both_models(model_name)
     values = importances["importance"].to_numpy(dtype=float)
 
     assert list(importances.columns) == ["feature", "importance"]
-    assert set(importances["feature"]) == set(model.SENTIMENT_MODEL_FEATURES)
-    assert len(importances) == len(model.SENTIMENT_MODEL_FEATURES)
+    assert set(importances["feature"]) == set(model.ENGINEERED_MODEL_FEATURES)
+    assert len(importances) == len(model.ENGINEERED_MODEL_FEATURES)
     assert np.isfinite(values).all()
     assert (values >= 0).all()
     assert values.sum() == pytest.approx(1.0)
@@ -183,3 +189,33 @@ def test_swing_levels_split_around_last_close():
     assert all(s["level"] < last for s in out["support"])
     assert all(r["level"] > last for r in out["resistance"])
     assert len(out["support"]) <= 2 and len(out["resistance"]) <= 2
+
+
+def test_engineered_sentiment_dynamics_are_present_and_finite():
+    dataset = build_dataset(
+        _prices(n_days=40),
+        pd.DataFrame(columns=["ticker", "date"]),
+        pd.DataFrame(columns=["ticker", "date"]),
+    )
+    for column in SENTIMENT_DYNAMICS:
+        assert column in dataset
+        assert np.isfinite(dataset[column].to_numpy(dtype=float)).all()
+    assert set(ENGINEERED_MODEL_FEATURES) <= set(dataset.columns)
+
+
+def test_pls_short_history_and_same_class_price_only_forecast():
+    dataset = _sentiment_dataset()
+    preds, n_sessions = model.leave_one_session_out(
+        dataset, alpha=10.0, shrink=0.3, model_name="pls",
+        scale=1.0, clip=0.05, components=6)
+    assert n_sessions > 0
+    assert len(preds) > 0
+    assert np.isfinite(preds["pred_ridge_sent"]).all()
+    assert np.isfinite(preds["pred_ridge_price"]).all()
+    assert not np.allclose(preds["pred_ridge_sent"], preds["pred_ridge_price"])
+
+    forecast = model.price_only_forecast(
+        dataset, alpha=10.0, shrink=0.3, model_name="pls", clip=0.05, components=6)
+    assert sorted(forecast["ticker"]) == ["0700.HK", "9988.HK"]
+    assert np.isfinite(forecast["pred_price_only_ret"]).all()
+    assert np.isfinite(forecast["pred_price_only_price"]).all()
