@@ -39,6 +39,28 @@ Social data is the bottleneck: 30 days gives only ~20 trading sessions. News was
    - Classifiers: AUC **0.40–0.49** (worse than random); ensemble net **-0.86%/day**.
    - Conclusion: transformers and more cross-sectional assets did not create a reliable edge.
 
+## Research-only direct Naver backfill
+
+After the paid tier was exhausted, the user allowed a research-only direct Naver API backfill (production remains Apify-only). This is free.
+
+- **90 days, 10 KR assets:** 29,124 posts, 64 sessions, 592 panel rows.
+- Best holding variant: **H=3 days, +0.311%/day net**, Sharpe 1.77, 95% CI **[-0.406%, +1.042%]**.
+- H=5: +0.282%/day, Sharpe 1.63, CI **[-0.354%, +1.001%]**.
+- H=1/2 were negative; H=10 ~zero.
+- Regression and classification models remained weak (AUC ~0.50; most net returns negative).
+- **Still not statistically reliable.**
+
+A 365-day backfill was then used for a **pre-registered confirmatory test** of the closest rule (long-only, H=4, positive-share top 2).
+
+- **365 days, 10 KR assets:** 65,699 transformer-scored posts, 244 sessions, 2,065 panel rows.
+- Long/short H=4: **+0.170%/day net**, Sharpe 1.04, 95% CI **[-0.142%, +0.510%]**.
+- **Pre-registered long-only H=4: +0.106%/day net**, Sharpe 0.93, 95% CI **[-0.128%, +0.335%]**.
+- H=3/H=5 long-short: +0.140%/+0.133%, CIs include zero.
+- Regression models negative; classifiers AUC **0.49–0.52**; net long-short negative.
+- **The 180-day long-only H=4 result (+0.35%/day) did not replicate.** It was sample-specific noise.
+
+**Final conclusion: no reliable edge.** This is not a budget issue anymore: 244 sessions, 10 assets, 65k transformer-scored posts, holding periods, costs, regression, classification and ensembles all fail the reliability bar.
+
 ## Conclusion
 
 **No reliable sentiment edge was found.** The honest state is:
@@ -52,19 +74,17 @@ This is a valid research outcome, not a failed pipeline. The project's contribut
 
 ## What would change the answer
 
-1. **60+ social sessions.** A single 30-day run gives ~20 sessions. A 90-day Naver backfill costs roughly **$2.8**; remaining free-tier credit is **~$1.08**, leaving a **~$1.7 shortfall**. Without more credit (or permission to backfill via the public Naver API for research only), the sample cannot reach the 60-session threshold.
-2. **Better sentiment extraction**: FinBERT/KR-FinBERT were tested and did not fix it; the next step would be a domain-tuned multilingual model or an LLM scorer with a labeled evaluation set.
-3. **More cross-sectional breadth**: 15 assets were tested; still 19 usable test days.
-4. **Event features**: extreme sentiment, post velocity, author credibility.
-5. **Execution realism**: borrow costs, slippage, liquidity, short availability.
+1. **A pre-registered single strategy** (one signal, one holding period) tested on 365+ days, not a sweep of H/k/sides.
+2. **Better sentiment labels**: domain-tuned multilingual finance model or an LLM scorer evaluated against human labels.
+3. **Event features**: extreme sentiment, post velocity, author credibility, news/social divergence.
+4. **Execution realism**: borrow costs, slippage, liquidity, short availability.
+5. **More assets**, not just more days, to stabilize cross-sectional portfolios.
 
 ## Exact blocker
 
-- Apify used: **$3.92 / $5.00**; remaining **~$1.08**.
-- Social panel: **22 sessions, 211 rows, 14 assets** after adding 5 Korean names.
-- To get **60+ social sessions**, need ~90 days of Naver history: ~**$2.8**, shortfall ~**$1.7**.
-- Or allow a **research-only direct Naver API backfill** (free, but deviates from the brief's Apify-only scraping requirement; production pipeline would still use Apify).
-- News (365 days) and price (5 years) were tested and have no edge after costs, so more of those does not help.
+- No budget blocker remains for research: the free direct Naver backfill reached **365 days / 244 sessions / 65k transformer-scored posts**.
+- The blocker is **signal quality**: no rule survives costs and bootstrap on the larger sample. More of the same data will not fix that.
+- A genuine attempt would need: better labels/domain-tuned sentiment, event features, and a pre-registered single strategy — not more multiple testing.
 
 ## Reproduce
 

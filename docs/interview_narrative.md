@@ -64,5 +64,6 @@
 - “This is a trading strategy.”
 - “I found a reliable sentiment edge.”
 - “Transformers fixed it.” (KR-FinBERT/FinBERT were tested; classifiers were below random AUC.)
+- “The 4-day hold worked.” (It looked good on 180 days but failed on 365 days: +0.11%/day, CI includes zero.)
 
 Say instead: “It is a reproducible research pipeline that tests whether sentiment adds value, and reports the answer honestly.”

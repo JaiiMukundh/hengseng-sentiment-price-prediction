@@ -73,7 +73,7 @@ The 30-day run is the current evidence. A previous 10-day snapshot showed 73% di
 - Exchange holidays are not explicitly modeled.
 - Market context features were tested but omitted because they worsened out-of-sample MAPE; they remain in the dataset for experiments.
 - The product/business claims of the company are unrelated to this model's validity.
-- An extended edge audit (30-day social, 365-day news, 5-year prices, 15-asset transformer panel, classification/ensembles, 10/25/50 bps costs, bootstrap) found **no reliable edge**. The social point estimate is positive but its 95% interval includes zero; news and price signals fail after costs; transformer classifiers are below random AUC; the only apparent winner was a constant-prediction artifact. See `reports/research/README.md`.
+- An extended edge audit (30-day social, 365-day news, 5-year prices, 15-asset transformer panel, 365-day direct Naver backfill, classification/ensembles, holding periods, costs, bootstrap) found **no reliable edge**. The 180-day long-only near-miss (+0.35%/day) did not replicate on 365 days (+0.11%/day, 95% CI [-0.13%, +0.34%]). See `reports/research/README.md`.
 
 ## Ethical / regulatory
 
