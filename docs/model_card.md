@@ -38,7 +38,7 @@ Social data is public; the repo does not publish raw posts or usernames. The liv
 - Social: log post count, mean and engagement-weighted sentiment, positive/negative shares, engagement, coverage flags.
 - News: log count, mean and weighted sentiment, coverage flags.
 - Market (ingested, not used in the final model): local index, US overnight, SOX, VIX, FX. Tested and omitted because it worsened out-of-sample MAPE in the previous 10-day snapshot.
-- Short sentiment model: 19 engineered features — the seven price technicals plus `social_sent_wmean`, `social_pos_share`, `social_neg_share`, `news_sent_wmean`, `social_n_log`, `has_social`, and six sentiment-dynamics features: `sent_chg`, `sent_ma3`, `sent_z`, `mention_chg`, `news_chg`, `news_social_div`.
+- Short sentiment model: 19 engineered features — the seven price technicals plus **unweighted** text sentiment (`social_sent_mean`, `social_pos_share`, `social_neg_share`, `news_sent_mean`), `social_n_log`, `has_social`, and six sentiment-dynamics features: `sent_chg`, `sent_ma3`, `sent_z`, `mention_chg`, `news_chg`, `news_social_div`. Unweighted text sentiment avoids post-publication engagement/follower leakage.
 
 ## Target
 
@@ -48,41 +48,43 @@ Social data is public; the repo does not publish raw posts or usernames. The liv
 
 - Long walk-forward: `naive` (no change), `ridge_price` (technicals only), and `ridge_sent` (technicals + sentiment). Ridge is used because the 1-year sample is small.
 - Short-history sentiment panel (used when sentiment sessions are below `min_train_dates`): pooled leave-one-session-out panel with a **6-component PLS** model over the engineered feature set above. The control is the same PLS on price technicals only, so the ablation isolates the sentiment features. Predictions are shrunk **0.30** toward zero and clipped at ±5%.
-- A small MLP (4–16 hidden units, LBFGS/Adam, early stopping), a deep MLP, Random Forest, gradient boosting, nearest neighbours, an RBF SVR and Ridge+MLP/PLS+SVR blends were tested in `experiments/`. The MLP and Ridge+MLP results were seed-sensitive; the RBF SVR was positive but below PLS (2.681% / 2.725%). The PLS+SVR blend moved LODO by ~0.003 pp, which is noise, so it was not shipped. Ridge remains the linear reference for coefficients.
+- The headline forecast is fitted on completed price sessions only; pending after-close rows are kept in the report but excluded from model fitting. This avoids copying the last close into a row with a different information set.
+- A small MLP (4–16 hidden units, LBFGS/Adam, early stopping), a deep MLP, Random Forest, gradient boosting, nearest neighbours, an RBF SVR and Ridge+MLP/PLS+SVR blends were tested in `experiments/`. The MLP and Ridge+MLP results were seed-sensitive; the RBF SVR was positive but below PLS. The PLS+SVR blend moved LODO by ~0.003 pp, which is noise, so it was not shipped. Ridge remains the linear reference for coefficients.
 - Nested selection of the model family and alpha inside each training fold is reported as a sensitivity check.
 
 ## Validation
 
 - Long model: expanding-window walk-forward, 60-session warm-up, 5-session blocks, one-session purge.
-- Short sentiment model: pooled leave-one-session-out over sentiment-covered sessions; same-class price-only control; nested model/alpha selection as a sensitivity check.
-- Secondary check: forward chaining on the last 12 sessions (120 rows), training only on sessions at least two dates earlier.
-- Metrics: MAE, RMSE, MAPE, direction accuracy, skill vs naive, and paired session-clustered bootstrap of the percentage-error improvement. See `reports/live/model_metrics.csv`, `reports/live/short_history_metrics.csv`, `reports/live/sentiment_nested_metrics.csv`, and `experiments/results/engineered_validation.csv`.
+- Short sentiment model: pooled leave-one-session-out diagnostic over sentiment-covered sessions; same-class price-only control; nested model/alpha selection as a sensitivity check.
+- Primary short-panel check: chronological forward chaining, 13 sessions / 130 rows. Every test session uses only older sessions, and the preceding session is excluded because its next-close label was unavailable.
+- Metrics: MAE, RMSE, MAPE, direction accuracy, skill vs naive, and paired session-clustered bootstrap of model-minus-naive percentage error. See `reports/live/model_metrics.csv`, `reports/live/short_history_metrics.csv`, `reports/live/sentiment_forward_metrics.csv`, `reports/live/paired_bootstrap.csv`, `reports/live/sentiment_nested_metrics.csv`, and `experiments/results/engineered_validation.csv`.
 
 ## Metrics snapshot — 30-day Apify + Exa run (2026-11-08)
 
 The 30-day run is the current evidence. A previous 10-day snapshot showed 73% direction; the larger sample showed that was small-sample noise.
 
 - Long walk-forward, 1,685 rows: naive **2.656%** MAPE, price-only **2.673%**, price+sentiment **2.806%**. Sentiment only exists for the last 30 days, so this is not the fair sentiment test.
-- **Ablation on the 30-day panel, 190 rows / 20 sessions (same PLS model class):**
+- **LODO diagnostic, 190 rows / 20 sessions (same PLS model class):**
 
 | Model | MAPE | Direction | Skill vs naive |
 |---|---:|---:|---:|
 | Naive | **2.707%** | — | — |
 | Price-only PLS | 2.747% | 51.6% | -1.45% |
-| **Price+sentiment PLS** | **2.664%** | **52.7%** | **+1.61%** |
+| **Price+sentiment PLS** | **2.663%** | **53.7%** | **+1.63%** |
 
-Sentiment improves MAPE versus the same-class price-only control by **0.083 pp** (3.0% relative), and the full model beats naive by **1.61%**. On the 111 social-mention rows the model is essentially tied with naive (3.243% vs 3.242%) but beats the price-only control (3.310%).
+Sentiment improves MAPE versus the same-class price-only control by **0.083 pp** (3.0% relative), and the full model beats naive by **1.63%**. On the 111 social-mention rows the model is essentially tied with naive (3.242% vs 3.242%) but beats the price-only control (3.310%).
 
-- **Forward-chaining check, last 12 sessions / 120 rows:** naive **2.751%**, price-only PLS **2.800%**, price+sentiment PLS **2.702%** (**+1.80%**), direction **60.0%**.
-- **Caveat:** the paired session-bootstrap 95% interval for the percentage-error improvement still includes zero (LODO -0.192 to +0.040 pp; forward -0.157 to +0.074 pp). The point estimate beats naive in both splits, but with 20 sessions this is not a statistically reliable trading edge.
+- **Chronological check, 130 rows / 13 sessions (primary):** naive **2.715%**, price-only PLS **2.743%**, price+sentiment PLS **2.654%** (**+2.26%**), direction **60.8%**. On the 80 social-mention rows, the model reaches **3.139%** vs **3.187%** naive (+1.50%) and **3.181%** for the price-only control.
+- **Caveat:** the paired session-bootstrap 95% interval for model-minus-naive percentage error still includes zero (LODO -0.188 to +0.043 pp; chronological -0.156 to +0.053 pp). The point estimate beats naive in both splits, but with 20 sessions this is not a statistically reliable trading edge.
 
 ## Limitations
 
 - The current-sentiment window (`social_days`, 10 days) is separate from the 30-day training window; a single 30-day Apify run gives ~20 sessions, still below the 60-session warm-up. The point estimate beats naive, but the paired bootstrap interval includes zero.
-- The 6-component PLS and the 0.30 shrinkage were selected after a model sprint; the forward check is encouraging but is not an independent holdout from all selection.
+- The 6-component PLS and the 0.30 shrinkage were selected after a model sprint; the chronological check is encouraging but is not an independent holdout from all selection.
+- Cached rows have no verified first-seen timestamp; 14 Exa timestamps are exactly midnight UTC and may have date-only precision. Future ingestions record `first_seen_utc`.
 - Lexicon sentiment handles simple negation but not sarcasm or all Korean/Cantonese slang; ~50% of Naver posts score neutral.
 - Naver is sampled, not exhaustive.
-- Exchange holidays are not explicitly modeled.
+- Exchange holidays are not explicitly modeled; the target session date is a business-day estimate.
 - Market context features were tested but omitted because they worsened out-of-sample MAPE; they remain in the dataset for experiments.
 - The product/business claims of the company are unrelated to this model's validity.
 

@@ -3,6 +3,13 @@
 This folder is a separate research sprint. It does **not** add a data source: every model below
 uses the same 30-day Apify social + Exa news panel as the production pipeline.
 
+> **Feature-set note.** The sprint tables below were produced on the earlier weighted-sentiment
+> feature set (`social_sent_wmean` / `news_sent_wmean`). The production model was later switched
+> to **unweighted** text sentiment (`social_sent_mean` / `news_sent_mean`) to avoid post-publication
+> engagement/follower leakage. The authoritative current production metrics are in
+> `reports/live/short_history_metrics.csv` and `reports/live/sentiment_forward_metrics.csv`;
+> the sprint numbers below are historical model-selection evidence, not the final headline.
+
 ## Setup
 
 - Panel: 20 sentiment-covered sessions x 10 tickers = **190 rows**.
@@ -24,7 +31,7 @@ over alpha, sentiment scale, shrinkage (lambda) and prediction clipping. A third
 components/scale/lambda/clip. A fourth grid tuned an RBF SVR on the engineered features
 (C, epsilon, gamma, sentiment scale, lambda, clip).
 
-## Final comparison (all on the same 190-row panel)
+## Historical sprint comparison (weighted-sentiment features, 190-row panel)
 
 | Candidate | LODO MAPE | LODO skill | LODO dir | Forward MAPE | Forward skill | Forward dir |
 |---|---:|---:|---:|---:|---:|---:|

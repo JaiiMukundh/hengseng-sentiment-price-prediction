@@ -61,6 +61,7 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
             "name": asset.name,
             "current_price": round(float(last["close"]), 4),
             "as_of": pd.Timestamp(last["date"]).date().isoformat(),
+            "target_session_estimate": fc["target_session_estimate"].iloc[0] if len(fc) and "target_session_estimate" in fc else None,
             "social_mentions": len(social),
             "news_items": len(news_t),
             "sentiment": round(sent, 3),
@@ -68,9 +69,9 @@ def summary_table(cfg: Config, prices: pd.DataFrame, posts: pd.DataFrame, news: 
             "model_close_n1": round(float(fc["pred_sent_price"].iloc[0]), 4) if len(fc) and "pred_sent_price" in fc else None,
             "model_move_pct": round(float(fc["pred_sent_ret"].iloc[0]) * 100, 2) if len(fc) and "pred_sent_ret" in fc else None,
             "model_signal": _signal(fc["pred_sent_ret"].iloc[0], cfg.raw["model"]["signal_threshold"]) if len(fc) and "pred_sent_ret" in fc else None,
-            "price_only_close_n1": round(float(fc["pred_price"].iloc[0]), 4) if len(fc) else None,
-            "price_only_move_pct": round(float(fc["pred_ret"].iloc[0]) * 100, 2) if len(fc) else None,
-            "price_only_signal": fc["signal"].iloc[0] if len(fc) else None,
+            "price_only_close_n1": round(float(fc["pred_price_only_price"].iloc[0]), 4) if len(fc) and "pred_price_only_price" in fc else None,
+            "price_only_move_pct": round(float(fc["pred_price_only_ret"].iloc[0]) * 100, 2) if len(fc) and "pred_price_only_ret" in fc else None,
+            "price_only_signal": _signal(fc["pred_price_only_ret"].iloc[0], cfg.raw["model"]["signal_threshold"]) if len(fc) and "pred_price_only_ret" in fc else None,
             "position": asset.position_label,
             "support": ", ".join(f"{s['level']:.2f}" for s in lv["support"]) or "-",
             "resistance": ", ".join(f"{r['level']:.2f}" for r in lv["resistance"]) or "-",
@@ -84,14 +85,16 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
                  coefficients: pd.DataFrame | None = None, banner: str | None = None,
                  nested_metrics: pd.DataFrame | None = None,
                  importances: pd.DataFrame | None = None,
-                 bootstrap: pd.DataFrame | None = None) -> Path:
+                 bootstrap: pd.DataFrame | None = None,
+                 forward_metrics: pd.DataFrame | None = None,
+                 forward_preds: pd.DataFrame | None = None) -> Path:
     charts = out_dir / "charts"
     charts.mkdir(parents=True, exist_ok=True)
     summary = summary_table(cfg, prices, posts, news, forecasts, levels)
     sections = []
 
     coverage = _coverage(posts, news)
-    check = _prediction_check(preds)
+    check = _prediction_check(forward_preds if forward_preds is not None and not forward_preds.empty else preds)
     sections.append(
         "<h2>Data coverage</h2>"
         "<p class='note'>The current-sentiment tables use the last 10 days. Model training uses up to 30 days "
@@ -123,6 +126,16 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
     metric_view = metrics.round(3)
     short_html = ""
     if short_metrics is not None and not short_metrics.empty:
+        forward_html = ""
+        if forward_metrics is not None and not forward_metrics.empty:
+            forward_html = ("<h3>Chronological forward check (primary)</h3>"
+                            "<p class='note'>Each test session uses only older sessions; the preceding "
+                            "session is excluded because its next-close label was unavailable. "
+                            "Settings were selected during earlier research, so this remains a "
+                            "retrospective check, not a fresh holdout. The forecast table's 80% "
+                            "band uses the 80th percentile of absolute forward residuals by exchange; "
+                            "it is descriptive and has no coverage guarantee.</p>"
+                            f"{_table(forward_metrics.round(3))}")
         nested_html = ""
         if nested_metrics is not None and not nested_metrics.empty:
             nested_html = (
@@ -133,6 +146,7 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
             )
         short_html = (
             "<h2>Sentiment model - short-history panel</h2>"
+            f"{forward_html}"
             "<p class='note'>Pooled leave-one-session-out over the sessions that have social/news data. "
             "Every row is predicted by a model trained on the other sessions. The deliverable is a 6-component "
             "PLS model on price technicals plus sentiment levels and dynamics; the control is the same PLS "
@@ -157,11 +171,10 @@ def write_report(out_dir: Path, cfg: Config, prices: pd.DataFrame, posts: pd.Dat
         )
     banner_html = f"<div class='banner'>{html.escape(banner)}</div>" if banner else ""
     forecast_view = forecasts.rename(columns={
-        "pred_ret": "price_only_pred_ret",
-        "pred_price": "price_only_pred_price",
-        "pred_sent_ret": "model_pred_ret",
-        "pred_sent_price": "model_pred_price",
-        "model_used": "price_model_used",
+        "pred_ret": "headline_pred_ret", "pred_price": "headline_pred_price",
+        "pred_price_only_ret": "price_only_pred_ret",
+        "pred_price_only_price": "price_only_pred_price",
+        "pred_sent_ret": "model_pred_ret", "pred_sent_price": "model_pred_price",
     })
     doc = _HTML.format(
         banner=banner_html,

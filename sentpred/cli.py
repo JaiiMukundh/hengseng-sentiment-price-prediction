@@ -104,7 +104,7 @@ def stage_scrape(cfg: Config, paths: Paths, reuse_raw: bool = False) -> None:
         before = len(new)
         new = new[new["published_utc"] >= cutoff]
         log.info("window filter: kept %d/%d posts published in the last %d days", len(new), before, window)
-    _append(paths.posts, new)
+    _append(paths.posts, new, observed=not reuse_raw)
 
 
 def stage_news(cfg: Config, paths: Paths) -> None:
@@ -116,15 +116,36 @@ def stage_news(cfg: Config, paths: Paths) -> None:
     df = fetch_news(cfg.assets, key,
                     cfg.raw["window"].get("history_days", cfg.raw["window"]["social_days"]),
                     cfg.raw["news"]["num_results"])
-    _append(paths.news, df)
+    _append(paths.news, df, observed=True)
     log.info("news: %d new items", len(df))
 
 
-def _append(path: Path, new: pd.DataFrame) -> None:
-    """Accumulate history across runs so sentiment coverage grows day by day; de-duplicate repeats."""
+def _append(path: Path, new: pd.DataFrame, observed: bool = False) -> None:
+    """Accumulate rows while retaining the earliest verified collection time.
+
+    Old cached rows have no first-seen time and remain unknown. Reused raw files
+    also remain unknown: their original collection time cannot be reconstructed.
+    """
     old = _read(path, [], POST_COLUMNS)
+    key = ["source", "ticker", "text", "published_utc"]
+    if "published_utc" in old and not old.empty:
+        old["published_utc"] = pd.to_datetime(old["published_utc"], utc=True, format="mixed")
+    if "first_seen_utc" not in old:
+        old["first_seen_utc"] = pd.NA
+    old["first_seen_utc"] = old["first_seen_utc"].astype("string")
+    new = new.copy()
+    if "published_utc" in new and not new.empty:
+        new["published_utc"] = pd.to_datetime(new["published_utc"], utc=True, format="mixed")
+    new["first_seen_utc"] = pd.Timestamp.now(tz="UTC").isoformat() if observed else pd.NA
+    new["first_seen_utc"] = new["first_seen_utc"].astype("string")
+    prior = old[key + ["first_seen_utc"]].drop_duplicates(key)
+    if not new.empty:
+        new = new.merge(prior, on=key, how="left", suffixes=("", "_prior"), indicator=True)
+        existing = new["_merge"] == "both"
+        new.loc[existing, "first_seen_utc"] = new.loc[existing, "first_seen_utc_prior"]
+        new = new.drop(columns=["first_seen_utc_prior", "_merge"])
     merged = pd.concat([old, new], ignore_index=True)
-    merged = merged.drop_duplicates(subset=["source", "ticker", "text", "published_utc"], keep="last")
+    merged = merged.drop_duplicates(subset=key, keep="last")
     merged.to_csv(path, index=False)
 
 
@@ -159,15 +180,22 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
     social_agg = align.aggregate(_utc(posts), calendars, "social_")
     news_agg = align.aggregate(_utc(news), calendars, "news_")
     dataset = features.build_dataset(prices, social_agg, news_agg, market)
+    # The model was trained on completed sessions with an observed close. Pending
+    # after-close rows have copied price features and a different information set.
+    forecast_dataset = features.completed_session_rows(dataset, prices)
 
     mcfg = cfg.raw["model"]
     preds = model.walk_forward(dataset, mcfg["min_train_dates"], mcfg["test_block"], mcfg["ridge_alpha"])
     metrics = model.evaluate(preds)
-    forecasts = model.live_forecast(dataset, metrics, mcfg["ridge_alpha"], mcfg["signal_threshold"])
+    forecasts = model.live_forecast(forecast_dataset, metrics, mcfg["ridge_alpha"], mcfg["signal_threshold"])
+    forecasts["target_session_estimate"] = forecasts["date"].map(
+        lambda day: pd.bdate_range(pd.Timestamp(day) + pd.Timedelta(days=1), periods=1)[0].date().isoformat())
     sent_sessions = int(dataset.loc[(dataset["has_social"] + dataset["has_news"] > 0)
                                     & dataset["y_next_ret"].notna(), "date"].nunique())
 
     short_metrics = None
+    forward_metrics = None
+    forward_preds = None
     nested_metrics = None
     coefficients = None
     importances = None
@@ -182,6 +210,12 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
         short_preds, short_dates = model.leave_one_session_out(
             dataset, sent_alpha, sent_shrink, sent_model, sent_scale, sent_clip, sent_components)
         short_metrics = model.evaluate(short_preds)
+        forward_preds = model.forward_sentiment_predictions(
+            dataset, sent_alpha, sent_shrink, sent_model, sent_scale, sent_clip, sent_components)
+        if not forward_preds.empty:
+            forward_metrics = model.evaluate(forward_preds)
+            forward_preds.to_csv(paths.processed / "sentiment_forward_predictions.csv", index=False)
+            forward_metrics.to_csv(paths.processed / "sentiment_forward_metrics.csv", index=False)
         bootstrap = evaluation.cluster_bootstrap(short_preds)
         nested = model.nested_sentiment_predictions(
             dataset, shrink=sent_shrink, scale=sent_scale, clip=sent_clip, components=sent_components)
@@ -192,19 +226,31 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
         importances = model.sentiment_importances(
             dataset, sent_model, sent_alpha, sent_scale, sent_components)
         forecasts = forecasts.merge(
-            model.sentiment_forecast(dataset, sent_alpha, sent_shrink, sent_model,
+            model.sentiment_forecast(forecast_dataset, sent_alpha, sent_shrink, sent_model,
                                      sent_scale, sent_clip, sent_components),
             on="ticker", how="left")
         price_only = model.price_only_forecast(
-            dataset, sent_alpha, sent_shrink, sent_model, sent_clip, sent_components)
+            forecast_dataset, sent_alpha, sent_shrink, sent_model, sent_clip, sent_components)
         forecasts = forecasts.merge(price_only, on="ticker", how="left")
-        forecasts["pred_ret"] = forecasts["pred_price_only_ret"]
-        forecasts["pred_price"] = forecasts["pred_price_only_price"]
+        forecasts["pred_ret"] = forecasts["pred_sent_ret"]
+        forecasts["pred_price"] = forecasts["pred_sent_price"]
         forecasts["signal"] = np.select(
             [forecasts["pred_ret"] > mcfg["signal_threshold"],
              forecasts["pred_ret"] < -mcfg["signal_threshold"]],
             ["LONG", "SHORT"], "FLAT")
-        forecasts["model_used"] = f"{sent_model}_price_only"
+        forecasts["model_used"] = f"{sent_model}_sentiment"
+        if not forward_preds.empty:
+            checked = forward_preds.copy()
+            checked["abs_residual_ret"] = (
+                checked["y_next_ret"] - checked["pred_ridge_sent"]).abs()
+            band = checked.groupby("exchange")["abs_residual_ret"].quantile(0.8)
+            forecasts["error_band_pct"] = forecasts["exchange"].map(band) * 100
+            width = forecasts["error_band_pct"] / 100
+            forecasts["forecast_low_80"] = forecasts["close"] * (1 + forecasts["pred_ret"] - width)
+            forecasts["forecast_high_80"] = forecasts["close"] * (1 + forecasts["pred_ret"] + width)
+            forecasts["direction_confidence"] = np.select(
+                [forecasts["pred_ret"] > width, forecasts["pred_ret"] < -width],
+                ["above_empirical_error", "below_empirical_error"], default="uncertain")
         short_metrics.to_csv(paths.processed / "short_history_metrics.csv", index=False)
         bootstrap.to_csv(paths.processed / "short_history_bootstrap.csv", index=False)
         nested_metrics.to_csv(paths.processed / "sentiment_nested_metrics.csv", index=False)
@@ -224,16 +270,28 @@ def stage_model(cfg: Config, paths: Paths) -> dict:
         px = prices[prices["ticker"] == asset.ticker].sort_values("date")
         if px.empty:
             continue
-        lvl[asset.ticker] = {**levels.swing_levels(px), "pivots": levels.pivot_points(px.iloc[-1])}
+        sw = levels.swing_levels(px)
+        piv = levels.pivot_points(px.iloc[-1])
+        # Keep the report complete when a 120-session swing window has no clustered level
+        # on one side of the last close: fall back to the classic daily pivot range.
+        if not sw["support"]:
+            sw["support"] = [{"level": round(piv["S1"], 4), "touches": 0},
+                             {"level": round(piv["S2"], 4), "touches": 0}]
+        if not sw["resistance"]:
+            sw["resistance"] = [{"level": round(piv["R1"], 4), "touches": 0},
+                                {"level": round(piv["R2"], 4), "touches": 0}]
+        lvl[asset.ticker] = {**sw, "pivots": piv}
 
     preds.to_csv(paths.processed / "walk_forward_predictions.csv", index=False)
     metrics.to_csv(paths.processed / "model_metrics.csv", index=False)
     forecasts.to_csv(paths.processed / "forecasts.csv", index=False)
-    log.info("model: %d out-of-sample rows; next-session price-only control: %s",
+    log.info("model: %d out-of-sample rows; next-session headline model: %s",
              len(preds), forecasts["model_used"].iloc[0] if len(forecasts) else "n/a")
     return {"prices": prices, "posts": posts, "news": news, "forecasts": forecasts,
             "levels": lvl, "metrics": metrics, "preds": preds, "sent_sessions": sent_sessions,
-            "short_metrics": short_metrics, "nested_metrics": nested_metrics,
+            "short_metrics": short_metrics, "forward_metrics": forward_metrics,
+            "forward_preds": forward_preds,
+            "nested_metrics": nested_metrics,
             "coefficients": coefficients, "importances": importances, "bootstrap": bootstrap}
 
 
@@ -251,7 +309,8 @@ def stage_report(cfg: Config, paths: Paths, state: dict, banner: str | None) -> 
     path = write_report(paths.report, cfg, state["prices"], state["posts"], state["news"],
                         state["forecasts"], state["levels"], state["metrics"], state["preds"],
                         state["short_metrics"], state["coefficients"], banner, state["nested_metrics"],
-                        state["importances"], state["bootstrap"])
+                        state["importances"], state["bootstrap"], state.get("forward_metrics"),
+                        state.get("forward_preds"))
     log.info("report written to %s", path)
     return path
 

@@ -138,6 +138,39 @@ def leave_one_session_out(df: pd.DataFrame, alpha: float, shrink: float = 1.0,
     return out.dropna(subset=["pred_ridge_price", "pred_ridge_sent"]).reset_index(drop=True), len(dates)
 
 
+def forward_sentiment_predictions(df: pd.DataFrame, alpha: float, shrink: float = 1.0,
+                                  model_name: str = "pls", scale: float = 1.0,
+                                  clip: float | None = None, components: int = 6,
+                                  min_train_dates: int = 6,
+                                  panel_dates=None) -> pd.DataFrame:
+    """Chronological short-panel evaluation with a one-session label purge.
+
+    Every prediction is fitted only on sessions at least two dates earlier. This is
+    the primary live-like check; leave-one-session-out is only a diagnostic.
+    """
+    if panel_dates is None:
+        data = _sentiment_rows(df)
+    else:
+        data = df.dropna(subset=["y_next_ret"] + ENGINEERED_MODEL_FEATURES)
+        data = data[data["date"].isin(panel_dates)].reset_index(drop=True)
+    dates = sorted(data["date"].unique())
+    blocks = []
+    for i in range(min_train_dates + 1, len(dates)):
+        train = data[data["date"].isin(dates[:i - 1])]
+        test = data[data["date"] == dates[i]].copy()
+        test["pred_naive"] = 0.0
+        for name, columns in (("ridge_price", PRICE_FEATURES),
+                              ("ridge_sent", ENGINEERED_MODEL_FEATURES)):
+            fitted = _fit(columns, train, alpha, model_name,
+                          scale if name == "ridge_sent" else 1.0, components)
+            test[f"pred_{name}"] = _predict(fitted, test[columns], clip) * shrink
+        blocks.append(test)
+    if not blocks:
+        return pd.DataFrame(columns=list(data.columns) +
+                            ["pred_naive", "pred_ridge_price", "pred_ridge_sent"])
+    return pd.concat(blocks, ignore_index=True)
+
+
 def sentiment_coefficients(df: pd.DataFrame, alpha: float, scale: float = 1.0,
                            model_name: str = "ridge", components: int = 6) -> pd.DataFrame:
     """Standardized model coefficients, kept as a linear reference for interpretation."""

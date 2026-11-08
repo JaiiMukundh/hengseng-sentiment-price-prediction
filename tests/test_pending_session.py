@@ -40,3 +40,6 @@ def test_after_close_post_becomes_pending_session_row():
     assert row["has_social"] == 1
     assert np.isnan(row["y_next_ret"])
     assert row["close"] == prices["close"].iloc[-1]
+    inference = features.completed_session_rows(dataset, prices)
+    assert inference["date"].max() == last_date
+    assert next_session not in set(inference["date"])

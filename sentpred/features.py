@@ -24,7 +24,7 @@ SENTIMENT_MODEL_FEATURES = [
 SENTIMENT_DYNAMICS = ["sent_chg", "sent_ma3", "sent_z", "mention_chg", "news_chg", "news_social_div"]
 # Winning short-history design from the model sprint: price technicals + sentiment level + dynamics.
 ENGINEERED_MODEL_FEATURES = PRICE_FEATURES + [
-    "social_sent_wmean", "social_pos_share", "social_neg_share", "news_sent_wmean",
+    "social_sent_mean", "social_pos_share", "social_neg_share", "news_sent_mean",
     "social_n_log", "has_social", *SENTIMENT_DYNAMICS,
 ]
 # Only these get the post-standardization importance multiplier; dynamics keep a natural scale.
@@ -145,7 +145,7 @@ def _append_pending_sessions(df: pd.DataFrame, social: pd.DataFrame, news: pd.Da
     return df
 
 
-def add_sentiment_dynamics(df: pd.DataFrame) -> pd.DataFrame:
+def add_sentiment_dynamics(df: pd.DataFrame, covered_dates=None) -> pd.DataFrame:
     """Per-ticker sentiment momentum, z-score and cross-source divergence.
 
     Dynamics are computed on sessions with social/news coverage, which is the panel the
@@ -157,21 +157,22 @@ def add_sentiment_dynamics(df: pd.DataFrame) -> pd.DataFrame:
     out = df.sort_values(["ticker", "date"]).copy()
     for column in SENTIMENT_DYNAMICS:
         out[column] = 0.0
-    covered_dates = out.loc[(out["has_social"] + out["has_news"]) > 0, "date"].unique()
+    if covered_dates is None:
+        covered_dates = out.loc[(out["has_social"] + out["has_news"]) > 0, "date"].unique()
     covered = out["date"].isin(covered_dates)
     if not covered.any():
         return out
 
     base = out.loc[covered].copy()
     g = base.groupby("ticker", sort=False)
-    base["sent_chg"] = g["social_sent_wmean"].diff().fillna(0.0)
-    base["sent_ma3"] = g["social_sent_wmean"].transform(lambda s: s.rolling(3, min_periods=1).mean())
-    roll = g["social_sent_wmean"].transform(lambda s: s.rolling(10, min_periods=3).mean())
-    std = g["social_sent_wmean"].transform(lambda s: s.rolling(10, min_periods=3).std()).replace(0, np.nan)
-    base["sent_z"] = ((base["social_sent_wmean"] - roll) / std).fillna(0.0)
+    base["sent_chg"] = g["social_sent_mean"].diff().fillna(0.0)
+    base["sent_ma3"] = g["social_sent_mean"].transform(lambda s: s.rolling(3, min_periods=1).mean())
+    roll = g["social_sent_mean"].transform(lambda s: s.rolling(10, min_periods=3).mean())
+    std = g["social_sent_mean"].transform(lambda s: s.rolling(10, min_periods=3).std()).replace(0, np.nan)
+    base["sent_z"] = ((base["social_sent_mean"] - roll) / std).fillna(0.0)
     base["mention_chg"] = g["social_n_log"].diff().fillna(0.0)
-    base["news_chg"] = g["news_sent_wmean"].diff().fillna(0.0)
-    base["news_social_div"] = base["news_sent_wmean"] - base["social_sent_wmean"]
+    base["news_chg"] = g["news_sent_mean"].diff().fillna(0.0)
+    base["news_social_div"] = base["news_sent_mean"] - base["social_sent_mean"]
     for column in SENTIMENT_DYNAMICS:
         out.loc[base.index, column] = base[column].to_numpy()
     return out
@@ -193,3 +194,9 @@ def build_dataset(prices: pd.DataFrame, social: pd.DataFrame, news: pd.DataFrame
         df[f"has_{prefix}"] = (df[f"{prefix}_n"] > 0).astype(float)
         df[f"{prefix}_n_log"] = np.log1p(df[f"{prefix}_n"])
     return add_sentiment_dynamics(_append_pending_sessions(df, social, news))
+
+
+def completed_session_rows(dataset: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
+    """Exclude pending sentiment rows from a model fitted on observed closing bars."""
+    keys = prices[["ticker", "date"]].drop_duplicates()
+    return dataset.merge(keys, on=["ticker", "date"], how="inner")

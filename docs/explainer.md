@@ -15,7 +15,7 @@ This project does the same for prices:
 - The model = a rule that combines sentiment with price behaviour.
 - Validation = replaying history day by day, without peeking at the future, and comparing against "tomorrow will be like today".
 
-The honest result: on the 30-day Apify+Exa panel the price+sentiment model improves MAPE versus the same-class price-only control (**2.664% vs 2.747%**) and beats the naive baseline (**2.707%**) by 1.61%. A forward check on the last 12 sessions gives **2.702% vs 2.751% naive** (+1.80%). The paired bootstrap interval still includes zero, so this is a small point-estimate improvement, not a proven money machine.
+The honest result: on the 30-day Apify+Exa panel the price+sentiment model improves MAPE versus the same-class price-only control (**2.663% vs 2.747%**) and beats the naive baseline (**2.707%**) by 1.63% in the leave-one-session-out diagnostic. The chronological check over 130 rows gives **2.654% vs 2.715% naive** (+2.26%, 60.8% direction). The paired bootstrap interval still includes zero, so this is a small point-estimate improvement, not a proven money machine.
 
 The model sprint tested ten families, including a small feedforward network, RBF-SVR and Ridge+MLP/PLS+SVR ensembles. The MLP and MLP ensemble were seed-sensitive; SVR was positive but below PLS; the PLS+SVR blend was noise. The production choice is a 6-component PLS model on price technicals plus sentiment levels and sentiment dynamics (change, moving average, z-score, mention/news changes, news-social divergence).
 
